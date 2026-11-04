@@ -1,0 +1,1 @@
+{"name":"infinity-therapy-ehpad","version":"1.0.0","private":true,"type":"module","scripts":{"start":"node server.js","test":"node --test tests/domain.test.js"},"engines":{"node":">=20"}}
