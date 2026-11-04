@@ -76,7 +76,8 @@ try{
  await page.screenshot({path:'/tmp/infinity-desktop.png',fullPage:true});
 
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').last().getByRole('button',{name:'Annuler',exact:true}).click();
+ assert.ok(await page.locator('#cancel-reason').evaluate(el=>el===document.activeElement));
  await page.locator('#cancel-reason').fill('Validation par erreur fictive.');
  accept=false;
  await page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click();
