@@ -3,3 +3,18 @@ node_modules/
 .DS_Store
 playwright-report/
 test-results/
+
+# Private runtime / credentials / backups must stay outside the checkout
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.before-restore-*
+.env
+.env.*
+config.json
+backups/
+data/
+*.pem
+*.key
+*.pfx

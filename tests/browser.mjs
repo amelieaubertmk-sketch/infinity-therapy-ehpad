@@ -1,18 +1,22 @@
 // Run with: PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node tests/browser.mjs
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
 const context=await browser.newContext({permissions:['clipboard-read','clipboard-write']});
+if(process.env.TEST_STATIC_DEMO)await context.route('https://demo.github.io/**',async route=>{const pathname=new URL(route.request().url()).pathname;const resource=pathname==='/'?'index.html':pathname.slice(1);if(!['index.html','src/app.js','src/store.js','src/demo-store.js','src/domain.js','src/style.css'].includes(resource))return route.abort();await route.fulfill({contentType:resource.endsWith('.html')?'text/html':resource.endsWith('.css')?'text/css':'text/javascript',body:await readFile(new URL('../'+resource,import.meta.url))});});
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
 let accept=true;page.on('dialog',d=>accept?d.accept():d.dismiss());
+async function write(action){if(process.env.TEST_LOGIN){const response=page.waitForResponse(r=>r.url().includes('/api/state')&&r.request().method()==='PUT');await action();const r=await response;assert.equal(r.status(),200);await page.waitForTimeout(40);}else await action();}
 try{
- await page.goto('http://localhost:3000');
+ await page.goto(process.env.BASE_URL||'http://localhost:3000');
+ if(process.env.TEST_LOGIN){await page.locator('#username').fill('admin');await page.locator('#password').fill(process.env.TEST_LOGIN);await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.getByRole('button',{name:'Boss',exact:true}).waitFor();}
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  await page.getByRole('button',{name:'Ajouter un résident'}).click();
  await page.getByLabel('Identifiant court').fill('FIC.');
  await page.getByLabel('Secteur',{exact:true}).selectOption('Maisonnée');
  for(const [i,text] of ['Marche fictive personnalisée.','Transfert fictif.','Renforcement fictif.','Soins fictifs.'].entries())await page.locator('#template-'+i).fill(text);
- await page.getByRole('button',{name:'Enregistrer le résident'}).click();
+ await write(()=>page.getByRole('button',{name:'Enregistrer le résident'}).click());
  assert.equal(await page.locator('tbody tr').count(),7);
  await page.getByRole('button',{name:'Kiné',exact:true}).click();
  await page.getByRole('button',{name:'Maisonnée',exact:true}).click();
@@ -20,11 +24,11 @@ try{
  assert.equal(await page.locator('#text').inputValue(),'Marche fictive personnalisée.');
  await page.getByLabel('Kinésithérapeute intervenant').selectOption('Alexandre');
  await page.locator('#observation').fill('Observation fictive de test.');
- await page.getByRole('button',{name:'Valider la transmission'}).click();
- await page.getByRole('button',{name:'Valider la transmission'}).click(); // duplicate confirmed
+ await write(()=>page.getByRole('button',{name:'Valider la transmission'}).click());
+ await write(()=>page.getByRole('button',{name:'Valider la transmission'}).click()); // duplicate confirmed
  await page.getByLabel('La séance n’a pas été réalisée').check();
  await page.getByLabel('Motif de non-réalisation').fill('Indisponibilité fictive');
- await page.getByRole('button',{name:'Enregistrer la non-réalisation'}).click();
+ await write(()=>page.getByRole('button',{name:'Enregistrer la non-réalisation'}).click());
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
  await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
@@ -33,28 +37,28 @@ try{
  assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/Marche fictive personnalisée/);
  assert.equal(await page.locator('#new-status').inputValue(),'À saisir');
  await page.locator('#new-status').selectOption('En cours de saisie');
- await page.getByRole('button',{name:'Confirmer le statut'}).click();
+ await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
  await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
- await page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();
+ await write(()=>page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
  await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
  await page.locator('#new-status').selectOption('À saisir');
- await page.getByRole('button',{name:'Confirmer le statut'}).click();
+ await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  let row=page.locator('tbody tr').filter({hasText:'FIC.'});
  await row.getByRole('button',{name:'Modifier & modèles'}).click();
  await page.locator('#template-0').fill('Nouveau modèle fictif.');
- await page.getByRole('button',{name:'Enregistrer le résident'}).click();
- await row.getByRole('button',{name:'Archiver',exact:true}).click();
+ await write(()=>page.getByRole('button',{name:'Enregistrer le résident'}).click());
+ await write(()=>row.getByRole('button',{name:'Archiver',exact:true}).click());
  assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
  await page.getByRole('button',{name:'Kiné',exact:true}).click();
  await page.getByRole('button',{name:'Nouvelle transmission',exact:false}).click();
  assert.equal(await page.locator('#resident option').filter({hasText:'FIC.'}).count(),0);
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  await page.getByRole('button',{name:'Archives',exact:true}).click();
- await page.getByRole('button',{name:'Réactiver'}).click();
+ await write(()=>page.getByRole('button',{name:'Réactiver'}).click());
  await page.getByRole('button',{name:'Kiné',exact:true}).click();
  await page.locator('#resident').selectOption({label:'FIC.'});
  assert.equal(await page.locator('#text').inputValue(),'Nouveau modèle fictif.');
@@ -83,7 +87,7 @@ try{
  await page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click();
  assert.ok(await page.locator('#cancel-form').isVisible());
  accept=true;
- await page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click();
+ await write(()=>page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
