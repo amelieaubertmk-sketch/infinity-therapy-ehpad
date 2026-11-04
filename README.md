@@ -99,3 +99,7 @@ PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/browser.mjs
 ## Publication de la démonstration sur GitHub Pages
 
 Les chemins des ressources sont relatifs pour supporter l’adresse d’un projet GitHub Pages. Dans le dépôt GitHub, ouvrez **Settings → Pages**, choisissez **Deploy from a branch**, puis **main** et **/(root)**, et cliquez sur **Save**. GitHub affiche ensuite l’adresse publiée et l’état du déploiement. Cette publication reste réservée aux tests fictifs ; les données restent locales à chaque navigateur.
+
+## Annuler une transmission validée par erreur
+
+Dans Kiné → Transmissions à saisir dans Titan, cliquez sur **Ouvrir**, indiquez un **motif d’annulation**, puis cliquez sur **Annuler cette transmission** et confirmez. Une transmission déjà saisie est accessible par **Voir l’historique**. L’entrée annulée est retirée des attentes et des compteurs de soins/saisies ; elle reste dans l’historique avec le texte d’origine, le motif, la date d’annulation et le statut précédent. Le filtre **Annulée** permet de la retrouver. Elle ne peut plus être copiée ou marquée comme saisie. Au besoin, créez une nouvelle transmission correcte. Si le texte a déjà été saisi dans Titan, corrigez-le aussi directement dans Titan : l’application ne le modifie pas.

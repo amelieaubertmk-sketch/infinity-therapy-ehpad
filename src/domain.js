@@ -15,5 +15,7 @@ export function createTransmission(db,input){
  const finalText=input.notPerformed?`Séance non réalisée\nMotif : ${reason}`:text+(observation?'\n\nObservation complémentaire\n'+observation:'');
  return {id:crypto.randomUUID(),residentId:resident.id,residentCode:resident.code,sector:resident.sector,date:input.date,activity:input.activity,practitioner:input.practitioner,text:input.notPerformed?'':text,observation:input.notPerformed?'':observation,reason:input.notPerformed?reason:'',notPerformed:!!input.notPerformed,finalText,validatedAt:new Date().toISOString(),status:statuses[0],statusHistory:[]};
 }
-export function potentialDuplicate(db,input){return db.transmissions.some(t=>t.residentId===input.residentId&&t.date===input.date&&t.activity===input.activity);}
-export function changeStatus(t,status){if(!statuses.includes(status))throw Error('Statut invalide.');return {...t,status,statusHistory:[...t.statusHistory,{from:t.status,to:status,at:new Date().toISOString()}]};}
+export function potentialDuplicate(db,input){return db.transmissions.some(t=>t.status!=='Annulée'&&t.residentId===input.residentId&&t.date===input.date&&t.activity===input.activity);}
+export function changeStatus(t,status){if(t.status==='Annulée')throw Error('Une transmission annulée ne peut plus changer de statut.');if(!statuses.includes(status))throw Error('Statut invalide.');return {...t,status,statusHistory:[...t.statusHistory,{from:t.status,to:status,at:new Date().toISOString()}]};}
+
+export function cancelTransmission(t,reason){if(t.status==='Annulée')throw Error('Transmission déjà annulée.');if(!reason?.trim())throw Error('Indiquez un motif d’annulation.');const at=new Date().toISOString();return {...t,status:'Annulée',cancellation:{reason:reason.trim(),at,previousStatus:t.status},statusHistory:[...t.statusHistory,{from:t.status,to:'Annulée',at}]};}
