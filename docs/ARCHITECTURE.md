@@ -47,7 +47,7 @@ Safari iPhone (5G + VPN Tailscale)
          Node.js -> SQLite disque local
 ```
 
-Le serveur vérifie l’en-tête Host et Origin contre `INFINITY_ORIGIN`. Il ne fait pas confiance aux en-têtes Tailscale pour accorder des droits. Node ne termine pas lui-même TLS ; Serve le fait sur le même PC. L’adresse publique GitHub Pages ne peut pas communiquer avec la base privée.
+Le serveur vérifie Origin contre `INFINITY_ORIGIN`. Pour Host, il accepte ce nom et les adresses loopback du port d’écoute, afin de supporter un proxy local qui réécrit Host. Les écritures exigent toujours l’origine HTTPS exacte configurée. Il ne fait pas confiance aux en-têtes Tailscale pour accorder des droits. Node ne termine pas lui-même TLS ; Serve le fait sur le même PC. L’adresse publique GitHub Pages ne peut pas communiquer avec la base privée.
 
 La tâche planifiée Windows lance le serveur sous le compte configuré, à privilèges limités. Les processus ne font pas partie d’une sauvegarde ni d’un snapshot cloud. SQLite WAL avec synchronisation FULL protège les transactions confirmées ; sauvegarder utilise l’API SQLite de sauvegarde plutôt que de copier un fichier actif.
 

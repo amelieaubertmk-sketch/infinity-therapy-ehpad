@@ -43,6 +43,7 @@ test('private server: accounts, RBAC, synchronization, conflicts, restart, backu
  write=await request('/api/state',{method:'PUT',client:clients.admin,body:{revision:state.revision,state:{...state.state,transmissions:[cancelled]}}});assert.equal(write.code,200);state=write.data;
  assert.equal(state.state.transmissions[0].finalText,created.finalText);
  // Admin can maintain users, with no password/hash returned.
+ assert.equal(await new Promise((resolve,reject)=>{const r=http.get(base+'/api/state',{headers:{host:'127.0.0.1:31002',cookie:clients.admin.cookie}},response=>{response.resume();resolve(response.statusCode);});r.on('error',reject);}),200);
  const users=await request('/api/users',{client:clients.admin});assert.ok(users.data.users.every(u=>!('password'in u)));
  assert.equal((await request('/api/users',{method:'POST',client:clients.admin,body:{username:'fourth',name:'Test fictif',role:'kine',active:true,password:'Another-fictitious-password-123'}})).code,200);
  const events=(await request('/api/audit',{client:clients.admin})).data.events;assert.ok(events.some(e=>e.action==='transmission.cancel'));assert.ok(!JSON.stringify(events).includes('Transmission fictive'));

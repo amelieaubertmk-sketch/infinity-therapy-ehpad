@@ -65,7 +65,7 @@ Les adresses et l’IP sont des exemples à remplacer. Préservez les règles in
 Dans l’Explorateur Windows, ouvrez le dossier du projet, faites un clic droit → **Ouvrir dans le Terminal**. Exécutez :
 
 ```powershell
-powershell -NoProfile -File .\scripts\configure-windows.ps1
+powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\configure-windows.ps1
 ```
 
 Si Windows bloque le script téléchargé, débloquez les scripts après en avoir vérifié la provenance :
@@ -76,7 +76,7 @@ Set-ExecutionPolicy -Scope Process RemoteSigned
 .\scripts\configure-windows.ps1
 ```
 
-Ne désactivez pas globalement les protections Windows. Le réglage `Process` ne concerne que le terminal courant.
+Ne désactivez pas globalement les protections Windows. Le réglage `Process` ne concerne que le terminal courant. Les commandes de lancement et la tâche planifiée appliquent également `RemoteSigned` uniquement à leur processus PowerShell ; les scripts téléchargés doivent être débloqués après vérification. Une stratégie de sécurité de votre organisation peut exiger l’intervention de son administrateur.
 
 1. Entrez l’adresse HTTPS exacte de l’étape précédente, sans chemin final.
 2. Choisissez un identifiant administrateur (minuscules, chiffres, points ou tirets).
@@ -95,7 +95,7 @@ node .\scripts\admin.js create
 ## 5. Démarrer et créer les deux autres comptes
 
 ```powershell
-powershell -NoProfile -File .\scripts\start-windows.ps1
+powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\start-windows.ps1
 ```
 
 Gardez ce terminal ouvert pendant l’essai. Sur le PC, ouvrez l’adresse **HTTPS Tailscale**, pas `localhost` : l’application vérifie l’adresse autorisée et utilise un cookie sécurisé. Connectez-vous au compte administrateur.

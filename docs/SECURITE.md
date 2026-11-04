@@ -5,7 +5,7 @@ L’auto-hébergement et le VPN ne rendent pas cette application conforme pour t
 ## Protections développées
 
 - Écoute du serveur sur `127.0.0.1` uniquement ; Tailscale Serve assure le proxy privé HTTPS. Aucun Funnel ni port public n’est requis.
-- Contrôle strict du nom d’hôte et de l’origine autorisée. HTTPS obligatoire pour une origine autre que localhost/127.0.0.1. Aucun CORS ouvert, aucune confiance dans des en-têtes utilisateur pour identifier les comptes.
+- Contrôle du nom d’hôte configuré (ou loopback du proxy local) et de l’origine exacte autorisée pour les écritures. HTTPS obligatoire pour une origine autre que localhost/127.0.0.1. Aucun CORS ouvert, aucune confiance dans des en-têtes utilisateur pour identifier les comptes.
 - Sessions opaques aléatoires de huit heures, jeton conservé haché en base, cookie HttpOnly, SameSite Strict et Secure pour l’origine HTTPS. Déconnexion et révocation des sessions lors des changements de compte.
 - Mots de passe hachés avec scrypt et sel aléatoire ; aucun compte ni mot de passe prédéfini. Longueur 12 à 256 caractères. Les réponses API ne retournent jamais le hachage.
 - Limitation persistante des tentatives de connexion, bornes de taille des requêtes, du nombre de connexions et du nombre de hachages de connexion simultanés.

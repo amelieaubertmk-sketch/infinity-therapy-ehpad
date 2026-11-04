@@ -16,7 +16,8 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  const server=http.createServer(async(req,res)=>{
  const json=(code,data,headers={})=>{res.writeHead(code,{...security,'Content-Type':'application/json; charset=utf-8',...headers});res.end(JSON.stringify(data));};
  try{
- if(req.headers.host!==allowed.host)return json(403,{error:'Hôte non autorisé.'});
+ const backendHosts=[allowed.host,`127.0.0.1:${req.socket.localPort}`,`localhost:${req.socket.localPort}`];
+ if(!backendHosts.includes(req.headers.host))return json(403,{error:'Hôte non autorisé.'});
  const url=new URL(req.url,allowed),route=url.pathname;
  if(!route.startsWith('/api/')){const files={'/':'index.html','/index.html':'index.html','/src/app.js':'src/app.js','/src/store.js':'src/store.js','/src/demo-store.js':'src/demo-store.js','/src/domain.js':'src/domain.js','/src/style.css':'src/style.css'};if(!files[route]||req.method!=='GET')return json(404,{error:'Introuvable.'});const file=files[route];res.writeHead(200,{...security,'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'});res.end(await readFile(path.join(root,file)));return;}
  if(!['GET','POST','PUT'].includes(req.method))return json(405,{error:'Méthode interdite.'});
