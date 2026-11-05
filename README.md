@@ -25,7 +25,7 @@ L’identité visuelle, les écrans Boss et Kiné et les parcours cliniques sont
 | Annuler une transmission avec motif | Oui | Oui | Non |
 | Comptes et journal des actions | Oui | Non | Non |
 
-Ces droits sont vérifiés côté serveur. Le praticien choisi dans une séance reste indépendant du compte connecté. Les textes des transmissions en attente restent indépendants des modèles ; l’archivage et l’annulation motivée sont conservés. Après confirmation de saisie Titan, la transmission est supprimée de la base active et de l’historique. Copier ne marque jamais automatiquement une saisie Titan.
+Ces droits sont vérifiés côté serveur. Le praticien choisi dans une séance reste indépendant du compte connecté. Les textes des transmissions en attente restent indépendants des modèles ; l’archivage et l’annulation motivée sont conservés. Après confirmation de saisie Titan, le texte et les observations sont supprimés ; une ligne de suivi reste dans l’historique. Copier ne marque jamais automatiquement une saisie Titan.
 
 ## Données partagées
 
@@ -60,14 +60,19 @@ PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/private-browser.m
 
 `CHROMIUM_PATH` permet de choisir le binaire Chromium. Les tests utilisent exclusivement des comptes et des bases temporaires fictifs. Voir le rapport de validation dans `docs/ARCHITECTURE.md`. Les scripts PowerShell et Tailscale doivent encore être validés sur votre véritable PC Windows et vos iPhones.
 
-## Suppression définitive et conservation après Titan — version 2.1
+## Suppression définitive et suivi après Titan — version 2.2
 
-Dans **Boss → Résidents & modèles**, le bouton **Supprimer définitivement** efface le résident, ses quatre modèles et toutes ses transmissions encore présentes, après confirmation indiquant leur nombre. Seule l’administratrice dispose de ce droit sur le serveur privé. L’archivage reste disponible comme alternative réversible.
+Dans **Boss → Résidents & modèles**, **Supprimer définitivement** efface le résident, ses quatre modèles, toutes ses transmissions restantes et ses lignes de suivi Titan, après confirmation. Seule l’administratrice dispose de ce droit sur le serveur privé. L’archivage reste une alternative réversible.
 
-**Marquer comme saisi sur Titan**, ou choisir ce même statut dans le menu, demande maintenant une confirmation explicite d’effacement. Après confirmation du serveur, la transmission entière est supprimée de la base active : texte, observation, dates, identité du résident et historique de statuts de cette entrée. Elle ne peut plus être retrouvée ni son statut corrigé dans l’application. Copier seul ne supprime jamais rien. Les compteurs décrivent les entrées encore présentes ; aucun compteur nominatif des saisies supprimées n’est conservé.
+**Marquer comme saisi sur Titan**, ou choisir ce statut dans le menu, demande une confirmation d’effacement du contenu. Après confirmation du serveur :
 
-Pour les transmissions déjà marquées comme saisies avant la mise à jour, Boss affiche **Effacer les anciennes saisies Titan** lorsqu’il en existe : confirmez pour les nettoyer. Une nouvelle confirmation Titan retire également les anciennes entrées déjà marquées saisies. Les transmissions en attente et annulées ne sont pas effacées par ce nettoyage.
+- Le texte, l’observation, le motif de non-réalisation éventuel et les champs complémentaires de la transmission sont supprimés de la base active.
+- Une ligne de suivi reste dans **Voir l’historique**, par exemple : **05/11/2026 · ARB. · Premier étage · Marche · Saisi sur Titan**. Le praticien et les dates de validation/confirmation sont conservés pour les filtres et le suivi. Une séance non réalisée garde uniquement un indicateur sans son motif.
+- **Voir le suivi** affiche ces seules informations, sans texte et sans bouton Copier, Annuler ou Modifier le statut. Il n’est pas possible de rétablir le contenu ou de rouvrir cette ligne comme une transmission à saisir.
+- Le compteur **Saisies sur Titan** compte ces lignes. Les attentes Titan n’incluent pas les lignes déjà saisies. **Copier seul ne supprime jamais rien.**
 
-La base privée utilise SQLite `secure_delete` et tente de tronquer son journal WAL après ces effacements. Cela ne constitue pas une garantie d’effacement physique sur le disque, les snapshots système ou un SSD. Les sauvegardes antérieures, les copies déjà exportées/collées et un ancien navigateur non actualisé peuvent conserver des données. Le journal d’audit conserve des événements techniques sans le texte supprimé ; des références techniques d’actions antérieures peuvent subsister. Les sauvegardes ne sont jamais détruites automatiquement.
+Les anciens enregistrements encore présents et marqués saisis sont convertis automatiquement en lignes sans contenu au redémarrage du serveur mis à jour ; les autres entrées restent inchangées. Le nettoyage est également appliqué au chargement de l’ancienne démonstration locale. Les transmissions déjà entièrement supprimées avec la version 2.1 ne peuvent pas être recréées automatiquement : aucune donnée permettant leur reconstitution n’a été conservée.
+
+SQLite utilise `secure_delete` et tente de tronquer son journal WAL après les effacements. Cela ne garantit pas l’effacement physique des anciennes données sur un SSD ou dans des snapshots système. Les sauvegardes antérieures, copies déjà exportées/collées et anciens onglets non actualisés peuvent contenir l’ancien texte. Les sauvegardes ne sont pas détruites automatiquement. Le journal d’audit conserve des événements techniques sans le texte supprimé.
 
 Sur le PC du cabinet, installez la nouvelle version du code selon [la procédure de mise à jour](docs/INSTALLATION-WINDOWS.md#10-mettre-à-jour-sans-perdre-les-données), puis redémarrez le serveur. Actualiser Safari seul ne met pas le serveur Windows à jour. Ces fonctions restent destinées aux données fictives.

@@ -7,7 +7,7 @@ export function mutation(current,proposed,user){
  if(!proposed||proposed.version!==1||!Array.isArray(proposed.residents)||!Array.isArray(proposed.transmissions))fail('Données invalides.');
  const removed=current.residents.filter(r=>!proposed.residents.some(n=>n.id===r.id));
  if(removed.length){if(user.role!=='admin')fail('Suppression réservée à l’administratrice.');if(removed.length!==1||!equal(proposed,deleteResident(current,removed[0].id)))fail('Suppression invalide : seul le résident choisi et ses transmissions peuvent être effacés.');return {state:deleteResident(current,removed[0].id),action:'resident.delete',target:null};}
- if(current.transmissions.some(t=>t.status==='Saisi sur Titan')&&equal(proposed,purgeTitan(current))){if(user.role!=='admin')fail('Nettoyage réservé à l’administratrice.');return {state:purgeTitan(current),action:'transmission.purgeTitan',target:null};}
+ if(!equal(current,purgeTitan(current))&&equal(proposed,purgeTitan(current))){if(user.role!=='admin')fail('Nettoyage réservé à l’administratrice.');return {state:purgeTitan(current),action:'transmission.purgeTitan',target:null};}
  const residentsChanged=!equal(current.residents,proposed.residents),txChanged=!equal(current.transmissions,proposed.transmissions);
  if(residentsChanged&&txChanged||!residentsChanged&&!txChanged)fail('Une seule action est autorisée à la fois.');
  if(residentsChanged){if(user.role!=='admin')fail('Administration réservée à l’administratrice.');if(proposed.residents.length<current.residents.length||proposed.residents.length>current.residents.length+1)fail('Suppression de résident interdite.');
@@ -15,10 +15,10 @@ export function mutation(current,proposed,user){
  const old=new Map(current.transmissions.map(t=>[t.id,t]));if(new Set(proposed.transmissions.map(t=>t.id)).size!==proposed.transmissions.length||current.transmissions.some(t=>!proposed.transmissions.some(n=>n.id===t.id)))fail('Suppression de transmission interdite.');
  const changed=proposed.transmissions.filter(t=>!equal(t,old.get(t.id)));if(changed.length!==1)fail('Une seule modification de transmission est autorisée.');const t=changed[0],previous=old.get(t.id);let result,action;
  if(!previous){if(!['admin','kine'].includes(user.role))fail('Création réservée aux kinésithérapeutes.');if(proposed.transmissions.length!==current.transmissions.length+1)fail('Ajout invalide.');if(['text','observation','reason'].some(k=>typeof t[k]!=='string'||t[k].length>20000)||typeof t.notPerformed!=='boolean')fail('Texte invalide.');result={...createTransmission(current,t),createdBy:user.id};action='transmission.create';}
- else {if(proposed.transmissions.length!==current.transmissions.length)fail('Modification invalide.');
+ else {if(previous.status==='Saisi sur Titan')fail('Le suivi Titan est définitif : le contenu a été effacé.');if(proposed.transmissions.length!==current.transmissions.length)fail('Modification invalide.');
  if(t.status==='Annulée'){if(!['admin','kine'].includes(user.role))fail('Annulation réservée aux kinésithérapeutes.');result=cancelTransmission(previous,t.cancellation?.reason);action='transmission.cancel';}
  else {result=changeStatus(previous,t.status);action='transmission.status';}
  const permitted=['status','statusHistory',...(t.status==='Annulée'?['cancellation']:[])];for(const k of new Set([...Object.keys(previous),...Object.keys(t)]))if(!permitted.includes(k)&&!equal(previous[k],t[k]))fail('Le texte historique ne peut pas être modifié.');}
  const nextState={...current,transmissions:previous?current.transmissions.map(x=>x.id===previous.id?result:x):[result,...current.transmissions]};
- return {state:result.status==='Saisi sur Titan'?purgeTitan(nextState):nextState,action:result.status==='Saisi sur Titan'?'transmission.completedAndDeleted':action,target:result.status==='Saisi sur Titan'?null:result.id};
+ return {state:result.status==='Saisi sur Titan'?purgeTitan(nextState):nextState,action:result.status==='Saisi sur Titan'?'transmission.completedContentDeleted':action,target:result.status==='Saisi sur Titan'?null:result.id};
 }

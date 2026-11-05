@@ -1,6 +1,6 @@
 # Installer Infinity Therapy sur le PC du cabinet et les iPhones
 
-> **Version 2.1 — nouvelle règle de conservation :** confirmer « Saisi sur Titan » supprime désormais la transmission de la base active et de l’historique, après avertissement. Le résident peut être supprimé définitivement par l’administratrice, avec ses modèles et ses transmissions restantes. Les sauvegardes antérieures ne sont pas effacées. Voir [la règle complète](../README.md#suppression-définitive-et-conservation-après-titan--version-21). Les indications plus anciennes concernant la conservation des transmissions après saisie Titan ne s’appliquent plus.
+> **Version 2.2 — suivi Titan :** après confirmation de saisie, le texte et les observations sont effacés de la base active, mais une ligne date/résident/secteur/activité/statut reste consultable dans l’historique. Les anciens contenus déjà marqués saisis sont nettoyés au redémarrage après mise à jour. La suppression définitive d’un résident efface aussi ses lignes de suivi. Les sauvegardes antérieures ne sont pas modifiées. Voir [la règle complète](../README.md#suppression-définitive-et-suivi-après-titan--version-22).
 
 
 Ce guide concerne **l’application privée partagée**, installée sur l’ordinateur du cabinet. L’ancien lien GitHub Pages reste une démonstration séparée : il ne partage pas ses données avec le PC.

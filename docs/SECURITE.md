@@ -1,6 +1,6 @@
 # Périmètre de sécurité — démonstration fictive uniquement
 
-> **Version 2.1 — nouvelle règle de conservation :** confirmer « Saisi sur Titan » supprime désormais la transmission de la base active et de l’historique, après avertissement. Le résident peut être supprimé définitivement par l’administratrice, avec ses modèles et ses transmissions restantes. Les sauvegardes antérieures ne sont pas effacées. Voir [la règle complète](../README.md#suppression-définitive-et-conservation-après-titan--version-21). Les indications plus anciennes concernant la conservation des transmissions après saisie Titan ne s’appliquent plus.
+> **Version 2.2 — suivi Titan :** après confirmation de saisie, le texte et les observations sont effacés de la base active, mais une ligne date/résident/secteur/activité/statut reste consultable dans l’historique. Les anciens contenus déjà marqués saisis sont nettoyés au redémarrage après mise à jour. La suppression définitive d’un résident efface aussi ses lignes de suivi. Les sauvegardes antérieures ne sont pas modifiées. Voir [la règle complète](../README.md#suppression-définitive-et-suivi-après-titan--version-22).
 
 
 L’auto-hébergement et le VPN ne rendent pas cette application conforme pour traiter des données réelles de santé. Les codes abrégés ne constituent pas une anonymisation. N’importez pas de noms, dossiers, observations ou transmissions réels. Il n’existe aucune migration automatique depuis le navigateur public vers la base du PC.
@@ -14,7 +14,7 @@ L’auto-hébergement et le VPN ne rendent pas cette application conforme pour t
 - Limitation persistante des tentatives de connexion, bornes de taille des requêtes, du nombre de connexions et du nombre de hachages de connexion simultanés.
 - Protection CSRF par origine exacte, JSON et jeton de session pour les écritures authentifiées.
 - Autorisations serveur, vérification des données entrantes, requêtes SQLite préparées et échappement HTML de l’affichage.
-- Texte clinique historique reconstruit/validé côté serveur, statuts et annulations horodatés par le serveur. La suppression en cascade d’un résident est réservée à l’administratrice ; une confirmation Titan supprime son entrée de transmission. Une suppression arbitraire de transmissions reste refusée par l’API.
+- Texte clinique historique reconstruit/validé côté serveur, statuts et annulations horodatés par le serveur. La suppression en cascade d’un résident est réservée à l’administratrice ; une confirmation Titan supprime le contenu de son entrée et conserve une ligne de suivi. Une suppression arbitraire de transmissions reste refusée par l’API.
 - Contrôle de révision global et transactions SQLite pour empêcher un écrasement silencieux concurrent. Une réponse perdue peut laisser une écriture confirmée en base mais non confirmée dans le navigateur : consulter l’historique avant de réessayer.
 - Audit avec compte, date, action et identifiant technique, sans texte de transmission ni mot de passe. L’administratrice consulte les 200 derniers événements. Cet audit sur le même disque n’est pas un journal inviolable : l’administrateur système peut modifier la base.
 - Aucun outil d’analyse, police distante, télémétrie applicative ou envoi de transmissions vers un tiers. Tailscale utilise ses propres services de coordination et, selon le réseau, des relais chiffrés ; la base demeure sur le PC.

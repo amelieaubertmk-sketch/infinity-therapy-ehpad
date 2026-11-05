@@ -42,8 +42,9 @@ try{
  accept=false;await page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();assert.ok(await page.locator('#mark-done').isVisible());accept=true;
  await write(()=>page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
+ await page.getByRole('button',{name:'Voir l’historique'}).click();assert.equal(await page.locator('tbody tr').count(),3);const summaryRow=page.locator('tbody tr').filter({hasText:'Saisi sur Titan'});await summaryRow.getByRole('button',{name:'Voir le suivi',exact:true}).click();assert.equal(await page.locator('#final-text').count(),0);assert.equal(await page.locator('#copy').count(),0);assert.equal(await page.locator('#new-status').count(),0);assert.match(await page.locator('#modal').innerText(),/Contenu effacé/);await page.getByRole('button',{name:'Fermer',exact:true}).click();await page.getByRole('button',{name:'Voir les transmissions en attente'}).click();
  await page.getByRole('button',{name:'Voir l’historique'}).click();
- assert.equal(await page.locator('tbody tr').count(),2);
+ assert.equal(await page.locator('tbody tr').count(),3);
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  let row=page.locator('tbody tr').filter({hasText:'FIC.'});
  await row.getByRole('button',{name:'Modifier & modèles'}).click();
@@ -61,7 +62,7 @@ try{
  await page.locator('#resident').selectOption({label:'FIC.'});
  assert.equal(await page.locator('#text').inputValue(),'Nouveau modèle fictif.');
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasText:'À saisir'}).last().getByRole('button',{name:'Ouvrir'}).click();
  assert.match(await page.locator('#final-text').innerText(),/Marche fictive personnalisée/);
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();
@@ -88,7 +89,7 @@ try{
  await write(()=>page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click());
  assert.equal(await page.locator('tbody tr').count(),1);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
- assert.equal(await page.locator('tbody tr').count(),2);
+ assert.equal(await page.locator('tbody tr').count(),3);
  const cancelledRow=page.locator('tbody tr').filter({hasText:'Annulée'});
  await cancelledRow.getByRole('button',{name:'Ouvrir'}).click();
  assert.match(await page.locator('#modal').innerText(),/Validation par erreur fictive/);
@@ -109,5 +110,5 @@ try{
  accept=true;await write(()=>deletionRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click());assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
  await page.reload();await page.getByRole('button',{name:'Boss',exact:true}).click();assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
  assert.deepEqual(errors,[]);
- console.log('PASS: resident creation, 4 templates, validation, duplicates, non-performance, clipboard, Titan deletion after confirmation, pending status correction, history, archive/reactivate, snapshot preservation, persistence, filters, mobile layout; cancellation confirmation, reason, history, exclusion from pending, persistence; no browser errors.');
+ console.log('PASS: resident creation, 4 templates, validation, duplicates, non-performance, clipboard, Titan content deletion with preserved summary, pending status correction, history, archive/reactivate, snapshot preservation, persistence, filters, mobile layout; cancellation confirmation, reason, history, exclusion from pending, persistence; no browser errors.');
 }finally{await browser.close();}
