@@ -1,33 +1,113 @@
-# Installation privée — Windows 11 et iPhone
+# Installer Infinity Therapy sur le PC du cabinet et les iPhones
 
-Cette procédure sert uniquement à une démonstration fictive. Aucun abonnement d’hébergement de base de données n’est nécessaire. Le PC doit rester allumé, connecté et hors veille pour être accessible à distance. La mise en place sur votre PC ne peut pas être effectuée depuis cette session cloud.
+Ce guide concerne **l’application privée partagée**, installée sur l’ordinateur du cabinet. L’ancien lien GitHub Pages reste une démonstration séparée : il ne partage pas ses données avec le PC.
 
-## 1. Préparer le PC
+**Ordinateur indiqué : Windows 11, version 26H2, build 26300.9818.** Cette information est celle que vous nous avez communiquée. L’installation n’a pas été testée sur ce PC ou cette build précise ; les vérifications ci-dessous permettront de la confirmer sur place.
 
-1. Installez **Node.js 24 LTS**, version 24.13 ou supérieure, depuis https://nodejs.org. Conservez les options proposées.
-2. Téléchargez le dépôt existant : GitHub → **Code → Download ZIP**. Extrayez-le dans un dossier permanent, par exemple `C:\InfinityTherapyDemo`. Évitez OneDrive et les dossiers synchronisés pour les données.
-3. Installez Tailscale depuis https://tailscale.com/download/windows et connectez le PC à votre réseau Tailscale privé.
-4. Dans Tailscale, activez **Run unattended** pour qu’il reste connecté après redémarrage sans ouverture de session Windows.
-5. Dans les paramètres d’alimentation Windows, empêchez la mise en veille du PC sur secteur. Ne désactivez pas ses mises à jour de sécurité.
+**Utilisez uniquement des résidents et transmissions fictifs.** Cette installation n’autorise pas l’utilisation de données médicales réelles.
 
-Tailscale propose une offre personnelle gratuite pour les usages éligibles. Vérifiez les conditions actuelles : un usage professionnel peut nécessiter une autre offre. Cette démonstration fictive n’impose aucun abonnement d’hébergement ; ne souscrivez pas automatiquement une offre payante pour la tester. Une alternative VPN reste possible mais nécessite une configuration distincte.
+## Avant de commencer
 
-## 2. Créer l’adresse privée HTTPS
+Prévoyez : le PC du cabinet, une connexion Internet, vos droits d’installation Windows et les deux iPhones. Effectuez les étapes dans l’ordre, sur le PC, sauf lorsque le guide indique « sur iPhone ».
 
-Dans PowerShell sur le PC :
+Le fonctionnement sera le suivant :
+
+- Le PC conserve la base de données et doit rester **allumé, connecté et sans mise en veille**.
+- Tailscale relie les appareils dans un réseau privé ; il ne faut ouvrir aucun port sur la box.
+- Chaque personne se connecte ensuite à Infinity Therapy avec son propre compte.
+
+Il y aura **trois sortes de comptes ou mots de passe** :
+
+| Compte | À quoi sert-il ? |
+| --- | --- |
+| Windows | Ouvrir la session du PC et autoriser son démarrage automatique |
+| Tailscale | Autoriser les appareils à rejoindre le réseau privé |
+| Infinity Therapy | Donner à chaque personne ses droits dans l’application |
+
+N’envoyez aucun mot de passe dans le chat, dans une capture d’écran ou sur GitHub. Aucun compte Infinity Therapy n’a de mot de passe prédéfini.
+
+## 1. Préparer le PC et télécharger l’application
+
+### A. Installer Node.js
+
+Node.js est le programme qui fait fonctionner l’application sur le PC.
+
+1. Sur le PC du cabinet, ouvrez [nodejs.org](https://nodejs.org/).
+2. Choisissez **Node.js 24 LTS**, version **24.13 ou supérieure dans la série 24**, et le programme d’installation Windows `.msi` adapté au PC. Si plusieurs architectures sont proposées : Windows → Paramètres → Système → Informations système → Type du système permet de vérifier x64 ou ARM64.
+3. Lancez le fichier téléchargé et conservez les options proposées. Les outils supplémentaires de compilation ne sont pas nécessaires à cette application.
+4. Fermez les anciens terminaux ouverts, puis ouvrez **Démarrer → PowerShell**.
+5. Copiez cette commande, puis appuyez sur **Entrée** :
+
+```powershell
+node --version
+```
+
+**Résultat attendu :** un numéro commençant par `v24.`, au moins `v24.13.0`. Si Windows indique que `node` n’est pas reconnu, fermez puis rouvrez PowerShell ; si nécessaire, réinstallez Node.js en conservant son ajout au PATH.
+
+### B. Télécharger le projet
+
+1. Ouvrez [le dépôt Infinity Therapy](https://github.com/amelieaubertmk-sketch/infinity-therapy-ehpad).
+2. Cliquez sur le bouton **Code**, puis **Download ZIP**.
+3. Dans les téléchargements Windows, faites un clic droit sur le ZIP → **Extraire tout**.
+4. Placez le dossier extrait dans un emplacement permanent, par exemple `C:\InfinityTherapyDemo`. Évitez de le laisser dans les téléchargements. Si Windows demande une autorisation pour créer ce dossier, utilisez un dossier permanent auquel votre compte a accès.
+5. Ouvrez ce dossier : vous devez voir directement **package.json**, **server.js**, **scripts** et **docs**. Si vous ne voyez qu’un second dossier, entrez dans celui-ci : c’est le véritable dossier du projet.
+
+Le code peut être public sur GitHub. **La base de données et les mots de passe restent sur le PC**, en dehors de ce dossier de code. Aucun transfert des données de l’ancienne démonstration n’est effectué.
+
+### C. Ouvrir PowerShell dans le bon dossier
+
+Dans l’Explorateur Windows, ouvrez le dossier qui contient `server.js`. Cliquez dans sa barre d’adresse, tapez `powershell`, puis appuyez sur Entrée. Une fenêtre PowerShell s’ouvre directement au bon endroit.
+
+Vérifiez :
+
+```powershell
+Test-Path .\scripts\configure-windows.ps1
+```
+
+**Résultat attendu : `True`.** Si vous obtenez `False`, retournez dans le dossier qui contient réellement `scripts` et `server.js`.
+
+Pour les blocs de commandes de ce guide, copiez uniquement le texte à l’intérieur du bloc, sans ajouter les mots « powershell » ou les délimiteurs du bloc. Exécutez les lignes dans l’ordre.
+
+### D. Installer Tailscale
+
+1. Téléchargez et installez Tailscale depuis [la page officielle Windows](https://tailscale.com/download/windows).
+2. Connectez le PC à votre compte Tailscale. Le compte qui gère ce réseau pourra ensuite inviter les autres personnes.
+3. Dans le menu de l’icône Tailscale, près de l’horloge Windows, recherchez **Run unattended** (« fonctionnement sans session ouverte ») et activez-le. Le libellé ou l’emplacement peut varier selon la version.
+4. Dans Windows → Paramètres → Système → Alimentation, empêchez la **mise en veille sur secteur** pendant les périodes d’utilisation. L’écran peut s’éteindre ; le PC doit continuer à fonctionner. Conservez les mises à jour de sécurité Windows.
+
+Tailscale propose une offre personnelle gratuite pour les usages éligibles. Vérifiez ses conditions actuelles : un usage professionnel peut nécessiter une autre offre. Aucun abonnement d’hébergement de base de données n’est nécessaire ; ne souscrivez pas automatiquement une offre payante pour tester cette démonstration fictive.
+
+## 2. Obtenir le lien privé de l’application
+
+Dans PowerShell, exécutez :
 
 ```powershell
 tailscale serve --bg http://127.0.0.1:3000
 tailscale serve status
 ```
 
-Tailscale peut vous demander d’autoriser HTTPS pour le réseau : ouvrez le lien qu’il affiche et suivez ses instructions. Notez l’adresse **https://nom-du-pc.nom-du-reseau.ts.net** donnée par Serve. Ce nom peut être publié dans les journaux de certificats publics ; choisissez un nom de machine neutre, sans information personnelle ou médicale.
+Si la commande `tailscale` n’est pas reconnue, fermez puis rouvrez PowerShell après l’installation. Si nécessaire, le programme est généralement accessible avec cette commande :
 
-**Utilisez Serve, jamais Funnel.** Serve est privé au réseau Tailscale. Ne créez aucune redirection de port sur la box, aucune règle Internet publique et aucun tunnel public. Ne désactivez pas la validation TLS du navigateur.
+```powershell
+& "$env:ProgramFiles\Tailscale\tailscale.exe" serve --bg http://127.0.0.1:3000
+& "$env:ProgramFiles\Tailscale\tailscale.exe" serve status
+```
+
+Tailscale peut afficher un lien pour autoriser HTTPS. Ouvrez **le lien qu’il fournit**, connectez-vous à votre compte Tailscale et suivez ses instructions, puis relancez la commande si demandé.
+
+**Résultat attendu :** une adresse ressemblant à `https://nom-du-pc.nom-du-reseau.ts.net`. Copiez votre adresse dans une note : c’est **le futur lien privé Infinity Therapy**, commun au PC et aux iPhones. L’adresse donnée ici est un exemple, elle ne doit pas être copiée telle quelle.
+
+À ce stade, l’application n’est pas encore démarrée : il est normal que cette adresse ne l’affiche pas. Continuez le guide jusqu’à l’étape 5.
+
+Utilisez un nom de PC neutre : le nom du certificat HTTPS peut apparaître dans des journaux de certificats publics. N’y mettez aucune information personnelle ou médicale.
+
+**Utilisez Tailscale Serve, jamais Funnel.** Serve fournit l’accès privé au réseau Tailscale. N’ouvrez aucun port public sur la box, ne configurez aucun tunnel public et n’ignorez pas les alertes de certificat du navigateur.
 
 ## 3. Limiter les personnes autorisées dans Tailscale
 
-Dans la console d’administration Tailscale :
+Cette étape limite les personnes et appareils pouvant atteindre le PC. Elle est plus technique : si le réseau Tailscale sert déjà à d’autres usages, faites-vous accompagner pour préserver ses règles existantes.
+
+Dans [la console d’administration Tailscale](https://login.tailscale.com/admin) :
 
 1. Invitez uniquement les personnes autorisées avec leurs propres comptes et activez une authentification multifacteur lorsque disponible.
 2. Autorisez et vérifiez chaque appareil ; utilisez l’approbation des appareils si proposée.
@@ -62,7 +142,15 @@ Les adresses et l’IP sont des exemples à remplacer. Préservez les règles in
 
 ## 4. Configurer l’application et son premier compte
 
-Dans l’Explorateur Windows, ouvrez le dossier du projet, faites un clic droit → **Ouvrir dans le Terminal**. Exécutez :
+Reprenez la fenêtre PowerShell ouverte dans le dossier du projet à l’étape 1C. Utilisez toujours le **même compte Windows** pour la configuration et le démarrage.
+
+Les scripts proviennent du dépôt que vous venez de télécharger. Après avoir vérifié cette provenance, débloquez-les pour Windows :
+
+```powershell
+Get-ChildItem .\scripts\*.ps1 | Unblock-File
+```
+
+Puis lancez la configuration :
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\configure-windows.ps1
@@ -78,10 +166,12 @@ Set-ExecutionPolicy -Scope Process RemoteSigned
 
 Ne désactivez pas globalement les protections Windows. Le réglage `Process` ne concerne que le terminal courant. Les commandes de lancement et la tâche planifiée appliquent également `RemoteSigned` uniquement à leur processus PowerShell ; les scripts téléchargés doivent être débloqués après vérification. Une stratégie de sécurité de votre organisation peut exiger l’intervention de son administrateur.
 
-1. Entrez l’adresse HTTPS exacte de l’étape précédente, sans chemin final.
+1. Quand la question apparaît, collez **votre adresse HTTPS Tailscale obtenue à l’étape 2**, sans chemin ni `:3000`, puis appuyez sur Entrée.
 2. Choisissez un identifiant administrateur (minuscules, chiffres, points ou tirets).
-3. Entrez le nom affiché puis le rôle **admin**.
-4. Choisissez et confirmez un mot de passe unique d’au moins 12 caractères. Il ne s’affiche pas pendant la saisie.
+3. Entrez le nom affiché. À la question du rôle, tapez exactement **admin**, puis Entrée.
+4. Choisissez et confirmez un mot de passe unique d’au moins 12 caractères. **Rien ne s’affiche pendant la saisie : c’est normal.** Appuyez sur Entrée après chaque saisie. Conservez-le dans votre gestionnaire de mots de passe.
+
+**Résultat attendu :** les messages « Compte enregistré » puis « Configuration enregistrée ». Ne relancez pas la configuration complète si elle a réussi.
 
 La configuration sans secret et la base fictive sont dans `%LOCALAPPDATA%\InfinityTherapyDemo`. Le script limite les droits Windows du dossier à votre compte et à SYSTEM. La base et les journaux ne doivent jamais être ajoutés au dépôt ni synchronisés vers un service externe.
 
@@ -92,15 +182,17 @@ $env:INFINITY_DATA_DIR = Join-Path $env:LOCALAPPDATA 'InfinityTherapyDemo'
 node .\scripts\admin.js create
 ```
 
-## 5. Démarrer et créer les deux autres comptes
+## 5. Ouvrir l’application sur le PC
+
+Dans PowerShell, toujours dans le dossier du projet :
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\start-windows.ps1
 ```
 
-Gardez ce terminal ouvert pendant l’essai. Sur le PC, ouvrez l’adresse **HTTPS Tailscale**, pas `localhost` : l’application vérifie l’adresse autorisée et utilise un cookie sécurisé. Connectez-vous au compte administrateur.
+**Résultat attendu :** un événement `server.started`. La fenêtre reste occupée : c’est normal, le serveur fonctionne. **Gardez cette fenêtre ouverte** pendant l’essai. Sur le PC, ouvrez l’adresse **HTTPS Tailscale**, pas `localhost` : l’application vérifie l’adresse autorisée et utilise un cookie sécurisé. Connectez-vous au compte administrateur.
 
-Dans **Boss → Utilisateurs → Ajouter un compte**, créez :
+Vous devez maintenant voir l’application habituelle, avec un écran de connexion au préalable. Dans **Boss → Utilisateurs → Ajouter un compte**, créez les deux autres comptes :
 
 - Le compte individuel du kinésithérapeute, rôle `kine`.
 - Le compte individuel du secrétariat, rôle `secretariat`.
@@ -113,19 +205,26 @@ Pour arrêter proprement un serveur manuel, cliquez dans son terminal puis faite
 
 Le script crée une tâche du Planificateur Windows sous votre compte, avec privilèges limités, déclenchée au démarrage même sans session ouverte. Il demande le **mot de passe Windows**, pas le PIN ; Windows gère ce secret, le projet ne l’enregistre pas. Un compte Windows avec mot de passe est nécessaire.
 
-1. Arrêtez le serveur manuel avec Ctrl+C.
-2. Depuis PowerShell dans le projet, exécutez :
+1. Arrêtez le serveur manuel en cliquant dans sa fenêtre puis en appuyant sur **Ctrl+C**. Ne démarrez pas deux serveurs simultanément.
+2. Ouvrez **Démarrer → PowerShell → Exécuter en tant qu’administrateur**, avec le **même compte Windows**. Si Windows exige les identifiants d’un autre compte, faites-vous accompagner : ne changez pas de compte au hasard.
+3. Revenez au dossier du projet. Si vous avez utilisé l’emplacement proposé :
 
 ```powershell
-.\scripts\install-startup.ps1
+Set-Location C:\InfinityTherapyDemo
+```
+
+Adaptez ce chemin si votre dossier est ailleurs. Puis exécutez :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\install-startup.ps1
 Start-ScheduledTask -TaskName InfinityTherapyDemo
 ```
 
 Si Windows refuse l’enregistrement d’une tâche au démarrage, ouvrez PowerShell **en tant qu’administrateur avec le même compte** et relancez. Ne configurez pas le serveur avec le compte SYSTEM, ni avec un autre compte : la configuration et les droits de données sont liés au compte choisi.
 
-3. Ouvrez le **Planificateur de tâches → Bibliothèque → InfinityTherapyDemo**. Vérifiez le déclencheur Au démarrage et « Exécuter même si l’utilisateur n’est pas connecté ».
-4. Redémarrez le PC et vérifiez l’adresse HTTPS avant d’ouvrir la session Windows. Ce test doit être fait sur votre PC ; il n’a pas été exécuté dans l’environnement Linux de développement.
-5. Si vous changez le mot de passe Windows ou déplacez le projet, mettez à jour la configuration et réenregistrez la tâche.
+4. Ouvrez le **Planificateur de tâches → Bibliothèque → InfinityTherapyDemo**. Vérifiez le déclencheur Au démarrage et « Exécuter même si l’utilisateur n’est pas connecté ».
+5. Redémarrez le PC et vérifiez l’adresse HTTPS avant d’ouvrir la session Windows. Ce test doit être fait sur votre PC ; il n’a pas été exécuté dans l’environnement Linux de développement.
+6. Si vous changez le mot de passe Windows ou déplacez le projet, mettez à jour la configuration et réenregistrez la tâche.
 
 Le serveur gère SIGINT/SIGTERM proprement. Windows peut cependant terminer de force une tâche ou un processus à l’extinction : SQLite utilise son journal WAL et des écritures synchrones pour conserver les transactions confirmées et récupérer après un arrêt brutal. Cela ne remplace pas une sauvegarde ni un test réel d’extinction Windows.
 
@@ -134,13 +233,20 @@ Le serveur gère SIGINT/SIGTERM proprement. Windows peut cependant terminer de f
 1. Installez **Tailscale** depuis l’App Store sur chacun des iPhones.
 2. Connectez chaque personne avec son compte Tailscale autorisé, approuvez l’appareil puis activez le VPN Tailscale.
 3. Désactivez le Wi-Fi pour le test et vérifiez la 5G.
-4. Dans Safari, ouvrez **la même adresse HTTPS Tailscale que sur le PC**.
+4. Dans Safari, collez **votre adresse HTTPS Tailscale notée à l’étape 2**, identique à celle utilisée sur le PC. N’utilisez ni `localhost`, ni le lien GitHub Pages.
 5. Connectez chaque personne avec son propre compte Infinity Therapy.
 6. Facultatif : dans Safari → Partager → **Sur l’écran d’accueil**.
 
-Testez une transmission fictive : elle doit apparaître dans le suivi sur l’autre appareil en environ cinq secondes lorsque la liste est visible. Le secrétariat la copie, la colle manuellement dans Titan, puis la marque comme saisie. Cette version ne communique jamais directement avec Titan.
+**Vérification à faire sur vos appareils :** créez une transmission fictive sur un iPhone. Elle doit apparaître dans le suivi sur l’autre appareil en environ cinq secondes lorsque la liste est visible. Le secrétariat la copie, la colle manuellement dans Titan, puis la marque comme saisie. Cette version ne communique jamais directement avec Titan.
 
 PC éteint, en veille ou déconnecté : l’application est indisponible. Elle ne fonctionne pas hors ligne. Le formulaire ouvert conserve votre saisie à l’écran après une erreur réseau ; ne fermez pas et ne rechargez pas la page si vous souhaitez la garder. Après une réponse perdue, consultez l’historique avant de renvoyer une transmission.
+
+## Après l’installation : ce qu’il faut garder
+
+- Votre lien privé HTTPS Tailscale, à mettre en favori sur les trois appareils.
+- Les identifiants individuels et mots de passe, dans un gestionnaire sécurisé.
+- Le dossier du code, à son emplacement permanent.
+- Le dossier des données et sa configuration : appuyez sur **Windows + R**, tapez `%LOCALAPPDATA%\InfinityTherapyDemo`, puis Entrée pour le retrouver. Ne supprimez pas ce dossier.
 
 ## 8. Sauvegarder
 
@@ -150,7 +256,7 @@ Depuis le terminal du projet, sous le même compte Windows :
 
 ```powershell
 $env:INFINITY_DATA_DIR = Join-Path $env:LOCALAPPDATA 'InfinityTherapyDemo'
-node .\scripts\backup.js 'E:\SauvegardesInfinity\demo-2026-11-04.sqlite'
+node .\scripts\backup.js 'E:\SauvegardesInfinity\demo-2026-11-05.sqlite'
 ```
 
 Adaptez la lettre de lecteur et choisissez un nom nouveau à chaque fois. L’outil refuse d’écraser une sauvegarde existante et utilise l’API SQLite de sauvegarde cohérente, même si le serveur tourne. N’effectuez pas une simple copie du fichier `demo.sqlite` pendant son utilisation : le WAL peut contenir des données récemment confirmées. Conservez séparément le fichier `config.json` et le dossier du projet, sans les publier.
@@ -169,7 +275,7 @@ Stop-ScheduledTask -TaskName InfinityTherapyDemo
 
 ```powershell
 $env:INFINITY_DATA_DIR = Join-Path $env:LOCALAPPDATA 'InfinityTherapyDemo'
-node .\scripts\restore.js 'E:\SauvegardesInfinity\demo-2026-11-04.sqlite' --server-stopped
+node .\scripts\restore.js 'E:\SauvegardesInfinity\demo-2026-11-05.sqlite' --server-stopped
 Start-ScheduledTask -TaskName InfinityTherapyDemo
 ```
 
@@ -209,3 +315,15 @@ node .\scripts\admin.js reset
 ```
 
 Entrez l’identifiant existant puis un nouveau mot de passe masqué, et redémarrez. Cet accès local doit être réservé aux personnes autorisées à administrer le PC.
+
+## Installation terminée : contrôles à cocher
+
+- [ ] Le PC affiche l’application à son adresse HTTPS privée.
+- [ ] Chaque utilisateur dispose de son compte individuel et du bon rôle.
+- [ ] Les deux iPhones ouvrent cette même adresse avec Tailscale actif et le Wi-Fi coupé.
+- [ ] Une transmission fictive créée sur un appareil apparaît sur l’autre.
+- [ ] Le statut Titan modifié par le secrétariat apparaît sur les autres appareils.
+- [ ] Le site redevient accessible après redémarrage du PC, même sans ouvrir sa session Windows.
+- [ ] Une sauvegarde a été créée et sa restauration testée sur des données fictives.
+
+Ces vérifications doivent être réalisées sur place : connaître la version Windows ne permet pas de les considérer comme réussies. Pour les limites et obligations avant toute utilisation réelle, consultez [le document de sécurité](SECURITE.md).
