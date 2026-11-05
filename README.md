@@ -76,3 +76,7 @@ Les anciens enregistrements encore présents et marqués saisis sont convertis a
 SQLite utilise `secure_delete` et tente de tronquer son journal WAL après les effacements. Cela ne garantit pas l’effacement physique des anciennes données sur un SSD ou dans des snapshots système. Les sauvegardes antérieures, copies déjà exportées/collées et anciens onglets non actualisés peuvent contenir l’ancien texte. Les sauvegardes ne sont pas détruites automatiquement. Le journal d’audit conserve des événements techniques sans le texte supprimé.
 
 Sur le PC du cabinet, installez la nouvelle version du code selon [la procédure de mise à jour](docs/INSTALLATION-WINDOWS.md#10-mettre-à-jour-sans-perdre-les-données), puis redémarrez le serveur. Actualiser Safari seul ne met pas le serveur Windows à jour. Ces fonctions restent destinées aux données fictives.
+
+## Présentation de l’interface — version 2.2.1
+
+Les mentions « démonstration » ont été retirées des écrans à la demande de l’utilisatrice. Les indications de stockage local ou de connexion au serveur restent visibles. Cette modification de présentation ne change ni les protections, ni les limites de sécurité documentées, et ne constitue pas une validation pour des données de santé réelles. Les données initiales restent fictives.
