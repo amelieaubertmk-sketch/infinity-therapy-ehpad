@@ -19,3 +19,6 @@ export function potentialDuplicate(db,input){return db.transmissions.some(t=>t.s
 export function changeStatus(t,status){if(t.status==='Annulée')throw Error('Une transmission annulée ne peut plus changer de statut.');if(!statuses.includes(status))throw Error('Statut invalide.');return {...t,status,statusHistory:[...t.statusHistory,{from:t.status,to:status,at:new Date().toISOString()}]};}
 
 export function cancelTransmission(t,reason){if(t.status==='Annulée')throw Error('Transmission déjà annulée.');if(!reason?.trim())throw Error('Indiquez un motif d’annulation.');const at=new Date().toISOString();return {...t,status:'Annulée',cancellation:{reason:reason.trim(),at,previousStatus:t.status},statusHistory:[...t.statusHistory,{from:t.status,to:'Annulée',at}]};}
+
+export function deleteResident(db,id){if(!db.residents.some(r=>r.id===id))throw Error('Résident introuvable.');return {...db,residents:db.residents.filter(r=>r.id!==id),transmissions:db.transmissions.filter(t=>t.residentId!==id)};}
+export function purgeTitan(db){return {...db,transmissions:db.transmissions.filter(t=>t.status!==statuses[2])};}

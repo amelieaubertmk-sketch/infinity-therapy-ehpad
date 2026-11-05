@@ -1,5 +1,8 @@
 # Installer Infinity Therapy sur le PC du cabinet et les iPhones
 
+> **Version 2.1 — nouvelle règle de conservation :** confirmer « Saisi sur Titan » supprime désormais la transmission de la base active et de l’historique, après avertissement. Le résident peut être supprimé définitivement par l’administratrice, avec ses modèles et ses transmissions restantes. Les sauvegardes antérieures ne sont pas effacées. Voir [la règle complète](../README.md#suppression-définitive-et-conservation-après-titan--version-21). Les indications plus anciennes concernant la conservation des transmissions après saisie Titan ne s’appliquent plus.
+
+
 Ce guide concerne **l’application privée partagée**, installée sur l’ordinateur du cabinet. L’ancien lien GitHub Pages reste une démonstration séparée : il ne partage pas ses données avec le PC.
 
 **Ordinateur indiqué : Windows 11, version 26H2, build 26300.9818.** Cette information est celle que vous nous avez communiquée. L’installation n’a pas été testée sur ce PC ou cette build précise ; les vérifications ci-dessous permettront de la confirmer sur place.

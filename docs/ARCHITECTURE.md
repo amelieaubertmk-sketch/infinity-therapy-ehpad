@@ -1,5 +1,8 @@
 # Architecture et validation
 
+> **Version 2.1 — nouvelle règle de conservation :** confirmer « Saisi sur Titan » supprime désormais la transmission de la base active et de l’historique, après avertissement. Le résident peut être supprimé définitivement par l’administratrice, avec ses modèles et ses transmissions restantes. Les sauvegardes antérieures ne sont pas effacées. Voir [la règle complète](../README.md#suppression-définitive-et-conservation-après-titan--version-21). Les indications plus anciennes concernant la conservation des transmissions après saisie Titan ne s’appliquent plus.
+
+
 ## Évolution du projet existant
 
 Les fichiers d’interface sont conservés : `src/app.js`, `src/style.css` et `index.html`. Les règles métier demeurent dans `src/domain.js`. `src/store.js` est maintenant un adaptateur asynchrone : les écritures attendent l’API. `src/demo-store.js` conserve uniquement l’ancienne démonstration publique fictive sur `.github.io`. Il n’existe aucune bascule locale après un échec du serveur privé.
@@ -53,7 +56,7 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 
 ## Validation automatisée
 
-`npm test` exécute huit tests métier et un scénario d’intégration API regroupant :
+`npm test` exécute treize tests : neuf tests métier, trois tests de conservation/suppression serveur et un scénario d’intégration API regroupant :
 
 - Trois connexions individuelles, authentification exigée et absence de hachages dans les réponses.
 - Administration réservée, refus de création/annulation pour le secrétariat et contrôle serveur du texte historique.
@@ -65,3 +68,5 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 `tests/private-browser.mjs` lance un serveur et une base temporaires avec des mots de passe aléatoires. Il exécute le parcours historique `tests/browser.mjs` après connexion, puis vérifie trois contextes navigateur indépendants, la synchronisation périodique, les droits visibles, le suivi Titan par le secrétariat, le journal, une largeur mobile et une panne réseau sans faux message de succès ni perte du texte du formulaire.
 
 Ces essais sont exécutés dans Chromium sur Linux. Ils ne constituent **pas** un test réel Windows, Safari iPhone, 5G, Tailscale, extinction Windows ou démarrage automatique. Les scripts PowerShell, le parcours de création du premier compte dans un terminal Windows et les règles Tailscale doivent encore être validés sur les équipements cibles. Aucun abonnement, appareil distant ou déploiement privé réel n’est configuré par les tests.
+
+Les nouveaux essais vérifient aussi la suppression en cascade réservée à l’administratrice, le refus des suppressions arbitraires, la disparition du texte après confirmation Titan, le nettoyage limité aux anciennes saisies et la persistance d’un effacement après redémarrage. Les parcours navigateur vérifient qu’annuler une confirmation ne supprime rien, puis que confirmer retire effectivement le résident et ses transmissions.

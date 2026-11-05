@@ -39,13 +39,11 @@ try{
  await page.locator('#new-status').selectOption('En cours de saisie');
  await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
  await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
+ accept=false;await page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();assert.ok(await page.locator('#mark-done').isVisible());accept=true;
  await write(()=>page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
- assert.equal(await page.locator('tbody tr').count(),3);
- await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
- await page.locator('#new-status').selectOption('À saisir');
- await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
+ assert.equal(await page.locator('tbody tr').count(),2);
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  let row=page.locator('tbody tr').filter({hasText:'FIC.'});
  await row.getByRole('button',{name:'Modifier & modèles'}).click();
@@ -68,7 +66,7 @@ try{
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- assert.equal(await page.locator('tbody tr').count(),3);
+ assert.equal(await page.locator('tbody tr').count(),2);
  await page.locator('#filter-practitioner').selectOption('Amélie');
  assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);
  await page.getByRole('button',{name:'Effacer',exact:true}).click();
@@ -88,9 +86,9 @@ try{
  assert.ok(await page.locator('#cancel-form').isVisible());
  accept=true;
  await write(()=>page.getByRole('button',{name:'Annuler cette transmission',exact:true}).click());
- assert.equal(await page.locator('tbody tr').count(),2);
+ assert.equal(await page.locator('tbody tr').count(),1);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
- assert.equal(await page.locator('tbody tr').count(),3);
+ assert.equal(await page.locator('tbody tr').count(),2);
  const cancelledRow=page.locator('tbody tr').filter({hasText:'Annulée'});
  await cancelledRow.getByRole('button',{name:'Ouvrir'}).click();
  assert.match(await page.locator('#modal').innerText(),/Validation par erreur fictive/);
@@ -100,10 +98,16 @@ try{
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- assert.equal(await page.locator('tbody tr').count(),2);
+ assert.equal(await page.locator('tbody tr').count(),1);
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  await page.locator('#filter-status').selectOption('Annulée');
  assert.equal(await page.locator('tbody tr').count(),1);
+ await page.getByRole('button',{name:'Boss',exact:true}).click();
+ await page.getByRole('button',{name:'Actifs',exact:true}).click();
+ const deletionRow=page.locator('tbody tr').filter({hasText:'FIC.'});
+ accept=false;await deletionRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click();assert.equal(await deletionRow.count(),1);
+ accept=true;await write(()=>deletionRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click());assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
+ await page.reload();await page.getByRole('button',{name:'Boss',exact:true}).click();assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
  assert.deepEqual(errors,[]);
- console.log('PASS: resident creation, 4 templates, validation, duplicates, non-performance, clipboard, all statuses, correction, history, archive/reactivate, snapshot preservation, persistence, filters, mobile layout; cancellation confirmation, reason, history, exclusion from pending, persistence; no browser errors.');
+ console.log('PASS: resident creation, 4 templates, validation, duplicates, non-performance, clipboard, Titan deletion after confirmation, pending status correction, history, archive/reactivate, snapshot preservation, persistence, filters, mobile layout; cancellation confirmation, reason, history, exclusion from pending, persistence; no browser errors.');
 }finally{await browser.close();}

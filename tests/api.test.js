@@ -9,13 +9,13 @@ import {spawnSync} from 'node:child_process';
 import {backup,DatabaseSync} from 'node:sqlite';
 import {createApp} from '../backend/server.js';
 import {hashPassword} from '../backend/auth.js';
-import {createTransmission,changeStatus,cancelTransmission} from '../src/domain.js';
+import {createTransmission,changeStatus,cancelTransmission,deleteResident} from '../src/domain.js';
 
 test('private server: accounts, RBAC, synchronization, conflicts, restart, backup and outage',async()=>{
  const directory=mkdtempSync(path.join(tmpdir(),'infinity-api-'));let app,base;
  async function start(){app=createApp({directory,origin:'http://localhost:31002'});app.server.listen(31002,'127.0.0.1');await once(app.server,'listening');base='http://localhost:'+app.server.address().port;}
  async function stop(){await new Promise(r=>app.server.close(r));app.close();}
- async function request(route,{method='GET',body,client,origin='http://localhost:31002',csrf=true}={}){if(client?.role==='secretariat'&&body?.state)body={...body,state:{...body.state,residents:body.state.residents.map(r=>({...r,templates:{}}))}};const r=await fetch(base+route,{method,headers:{Host:'localhost:31002',Origin:origin,'Content-Type':'application/json',...(client?{Cookie:client.cookie,...(csrf?{'X-CSRF-Token':client.csrf}:{})}:{})},...(body?{body:JSON.stringify(body)}:{})});return {code:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')};}
+ async function request(route,{method='GET',body,client,origin='http://localhost:31002',csrf=true}={}){if(client?.role==='secretariat'&&body?.state)body={...body,state:{...body.state,residents:body.state.residents.map(r=>({...r,templates:{}}))}};const r=await fetch(base+route,{method,headers:{Connection:'close',Host:'localhost:31002',Origin:origin,'Content-Type':'application/json',...(client?{Cookie:client.cookie,...(csrf?{'X-CSRF-Token':client.csrf}:{})}:{})},...(body?{body:JSON.stringify(body)}:{})});return {code:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')};}
  try{
  await start();const password=await hashPassword('Fictitious-only-password-123');
  for(const role of ['admin','kine','secretariat'])app.db.prepare('INSERT INTO users VALUES(?,?,?,?,?,1)').run(role,role,'Compte fictif '+role,role,password);
@@ -38,7 +38,8 @@ test('private server: accounts, RBAC, synchronization, conflicts, restart, backu
  const altered={...created,finalText:'Tampered text',status:'Saisi sur Titan'};
  assert.equal((await request('/api/state',{method:'PUT',client:clients.secretariat,body:{revision:state.revision,state:{...state.state,transmissions:[altered]}}})).code,400);
  const done=changeStatus(created,'Saisi sur Titan');write=await request('/api/state',{method:'PUT',client:clients.secretariat,body:{revision:state.revision,state:{...state.state,transmissions:[done]}}});assert.equal(write.code,200);state=(await request('/api/state',{client:clients.admin})).data;
- assert.equal((await request('/api/state',{client:clients.kine})).data.state.transmissions[0].status,'Saisi sur Titan');
+ assert.equal((await request('/api/state',{client:clients.kine})).data.state.transmissions.length,0);assert.ok(!JSON.stringify(state.state).includes('Transmission fictive partagée.'));
+ const replacement=createTransmission(state.state,{residentId:state.state.residents[0].id,date:'2026-11-04',activity:'Marche',practitioner:'Alexandre',text:'Transmission fictive partagée.',observation:'Observation fictive.'});write=await request('/api/state',{method:'PUT',client:clients.kine,body:{revision:state.revision,state:{...state.state,transmissions:[replacement]}}});assert.equal(write.code,200);state=write.data;
  const cancelled=cancelTransmission(state.state.transmissions[0],'Erreur fictive');assert.equal((await request('/api/state',{method:'PUT',client:clients.secretariat,body:{revision:state.revision,state:{...state.state,transmissions:[cancelled]}}})).code,403);
  write=await request('/api/state',{method:'PUT',client:clients.admin,body:{revision:state.revision,state:{...state.state,transmissions:[cancelled]}}});assert.equal(write.code,200);state=write.data;
  assert.equal(state.state.transmissions[0].finalText,created.finalText);
@@ -52,6 +53,10 @@ test('private server: accounts, RBAC, synchronization, conflicts, restart, backu
  await stop();await assert.rejects(()=>fetch(base+'/api/state'));await start();const restored=(await request('/api/state',{client:clients.admin})).data;assert.equal(restored.state.transmissions[0].status,'Annulée');assert.equal(restored.revision,state.revision);
  const secret=app.db.prepare('SELECT * FROM users WHERE id=?').get('secretariat');assert.equal((await request('/api/users',{method:'POST',client:clients.admin,body:{id:secret.id,username:secret.username,name:secret.name,role:secret.role,active:false}})).code,200);assert.equal((await request('/api/state',{client:clients.secretariat})).code,401);
  assert.equal(await new Promise((resolve,reject)=>{const r=http.get(base+'/',{headers:{host:'evil.invalid'}},response=>{response.resume();resolve(response.statusCode);});r.on('error',reject);}),403);
+ const residentId=restored.state.residents[0].id,deleted=deleteResident(restored.state,residentId);
+ assert.equal((await request('/api/state',{method:'PUT',client:clients.kine,body:{revision:restored.revision,state:deleted}})).code,403);
+ const deletion=await request('/api/state',{method:'PUT',client:clients.admin,body:{revision:restored.revision,state:deleted}});assert.equal(deletion.code,200);assert.equal(deletion.data.state.residents.length,5);assert.equal(deletion.data.state.transmissions.length,0);assert.ok(!app.db.prepare('SELECT data FROM state').get().data.includes(created.finalText));
+ await stop();await start();assert.equal((await request('/api/state',{client:clients.admin})).data.state.residents.length,5);
  console.log('Verified three separate accounts, server-side permissions, shared state, immutable history, stale-write rejection, CSRF, audit, restart, consistent backup and unavailable server.');
  }finally{if(app?.server.listening)await stop();rmSync(directory,{recursive:true,force:true});}
 });

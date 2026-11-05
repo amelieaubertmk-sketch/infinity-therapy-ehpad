@@ -1,7 +1,7 @@
 // Public GitHub Pages remains an explicitly separate, fictitious local demo.
 // The private server never falls back to browser storage, even on network failure.
 export const demo=location.hostname.endsWith('.github.io');
-const local=demo?await import('./demo-store.js'):null;
+const local=demo?await import('./demo-store.js?v=retention1'):null;
 export const key=local?.key;
 let csrf='',revision=0;
 export let user=null;
@@ -18,4 +18,4 @@ export async function readSnapshot(){return request('/api/state');}
 export async function load(){if(demo)return local.load();const data=await readSnapshot();revision=data.revision;return data.state;}
 export function acceptSnapshot(data){revision=data.revision;return data.state;}
 export function currentRevision(){return revision;}
-export async function save(db){if(demo){local.save(db);return db;}const data=await request('/api/state','PUT',{revision,state:db});revision=data.revision;return data.state;}
+export async function save(db){if(demo){local.save(db);return local.load();}const data=await request('/api/state','PUT',{revision,state:db});revision=data.revision;return data.state;}

@@ -24,7 +24,7 @@ try{
  assert.match(await secretary.locator('#final-text').innerText(),/synchronisée entre comptes/);assert.equal(await secretary.locator('#cancel-form').count(),0);
  secretary.on('dialog',d=>d.accept());await secretary.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();
  await kine.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await kine.getByRole('button',{name:'Voir l’historique'}).click();
- await kine.locator('tbody tr').filter({hasText:'ARB.'}).filter({hasText:'Saisi sur Titan'}).waitFor({timeout:15000});
+ await kine.waitForFunction(()=>!Array.from(document.querySelectorAll('tbody tr')).some(r=>r.textContent.includes('ARB.')),{},{timeout:15000});
  await pages.admin.getByRole('button',{name:'Boss',exact:true}).click();await pages.admin.getByRole('button',{name:'Utilisateurs',exact:true}).click();await pages.admin.getByRole('button',{name:'Ajouter un compte'}).waitFor();
  await pages.admin.getByRole('button',{name:'Ajouter un compte'}).click();await pages.admin.locator('#user-name').fill('Compte supplémentaire fictif');await pages.admin.locator('#user-login').fill('test-extra');await pages.admin.locator('#user-password').fill(password);await pages.admin.getByRole('button',{name:'Enregistrer le compte',exact:true}).click();await pages.admin.locator('#users-list').getByText('Compte supplémentaire fictif',{exact:false}).waitFor();
 

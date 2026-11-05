@@ -1,11 +1,11 @@
 {
   "name": "infinity-therapy-ehpad",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/domain.test.js tests/api.test.js",
+    "test": "node --test tests/domain.test.js tests/api.test.js tests/retention.test.js",
     "user:create": "node scripts/admin.js create",
     "user:reset": "node scripts/admin.js reset",
     "backup": "node scripts/backup.js",

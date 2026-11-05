@@ -1,10 +1,13 @@
 import {isDeepStrictEqual as equal} from 'node:util';
-import {activities,sectors,createTransmission,changeStatus,cancelTransmission} from '../src/domain.js';
+import {activities,sectors,createTransmission,changeStatus,cancelTransmission,deleteResident,purgeTitan} from '../src/domain.js';
 const fail=m=>{throw Error(m);};
 function residentValid(r){if(typeof r.id!=='string'||!r.id||typeof r.code!=='string'||!r.code.trim()||r.code.length>30||!sectors.includes(r.sector)||typeof r.archived!=='boolean'||!r.templates||Object.keys(r.templates).length!==4||activities.some(a=>typeof r.templates[a]!=='string'||r.templates[a].length>20000))fail('Résident ou modèles invalides.');return {id:r.id,code:r.code.trim(),sector:r.sector,archived:r.archived,templates:r.templates};}
 // Apply one explicit change to a server-owned snapshot; never trust client historical fields.
 export function mutation(current,proposed,user){
  if(!proposed||proposed.version!==1||!Array.isArray(proposed.residents)||!Array.isArray(proposed.transmissions))fail('Données invalides.');
+ const removed=current.residents.filter(r=>!proposed.residents.some(n=>n.id===r.id));
+ if(removed.length){if(user.role!=='admin')fail('Suppression réservée à l’administratrice.');if(removed.length!==1||!equal(proposed,deleteResident(current,removed[0].id)))fail('Suppression invalide : seul le résident choisi et ses transmissions peuvent être effacés.');return {state:deleteResident(current,removed[0].id),action:'resident.delete',target:null};}
+ if(current.transmissions.some(t=>t.status==='Saisi sur Titan')&&equal(proposed,purgeTitan(current))){if(user.role!=='admin')fail('Nettoyage réservé à l’administratrice.');return {state:purgeTitan(current),action:'transmission.purgeTitan',target:null};}
  const residentsChanged=!equal(current.residents,proposed.residents),txChanged=!equal(current.transmissions,proposed.transmissions);
  if(residentsChanged&&txChanged||!residentsChanged&&!txChanged)fail('Une seule action est autorisée à la fois.');
  if(residentsChanged){if(user.role!=='admin')fail('Administration réservée à l’administratrice.');if(proposed.residents.length<current.residents.length||proposed.residents.length>current.residents.length+1)fail('Suppression de résident interdite.');
@@ -16,5 +19,6 @@ export function mutation(current,proposed,user){
  if(t.status==='Annulée'){if(!['admin','kine'].includes(user.role))fail('Annulation réservée aux kinésithérapeutes.');result=cancelTransmission(previous,t.cancellation?.reason);action='transmission.cancel';}
  else {result=changeStatus(previous,t.status);action='transmission.status';}
  const permitted=['status','statusHistory',...(t.status==='Annulée'?['cancellation']:[])];for(const k of new Set([...Object.keys(previous),...Object.keys(t)]))if(!permitted.includes(k)&&!equal(previous[k],t[k]))fail('Le texte historique ne peut pas être modifié.');}
- return {state:{...current,transmissions:previous?current.transmissions.map(x=>x.id===previous.id?result:x):[result,...current.transmissions]},action,target:result.id};
+ const nextState={...current,transmissions:previous?current.transmissions.map(x=>x.id===previous.id?result:x):[result,...current.transmissions]};
+ return {state:result.status==='Saisi sur Titan'?purgeTitan(nextState):nextState,action:result.status==='Saisi sur Titan'?'transmission.completedAndDeleted':action,target:result.status==='Saisi sur Titan'?null:result.id};
 }
