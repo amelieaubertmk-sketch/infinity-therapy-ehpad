@@ -23,6 +23,7 @@ L’identité visuelle, les écrans Boss et Kiné et les parcours cliniques sont
 | Consulter les transmissions | Oui | Oui | Oui |
 | Copier et suivre les statuts Titan | Oui | Oui | Oui |
 | Annuler une transmission avec motif | Oui | Oui | Non |
+| Supprimer une ligne de suivi Titan | Oui | Non | Non |
 | Comptes et journal des actions | Oui | Non | Non |
 
 Ces droits sont vérifiés côté serveur. Le praticien choisi dans une séance reste indépendant du compte connecté. Les textes des transmissions en attente restent indépendants des modèles ; l’archivage et l’annulation motivée sont conservés. Après confirmation de saisie Titan, le texte et les observations sont supprimés ; une ligne de suivi reste dans l’historique. Copier ne marque jamais automatiquement une saisie Titan.
@@ -86,3 +87,7 @@ Les mentions « démonstration » ont été retirées des écrans à la demande 
 Les nouvelles bases privées démarrent avec une liste vide. Une mise à jour ne supprime pas silencieusement les données d’un cabinet existant : après avoir installé les nouveaux fichiers et redémarré le serveur, connectez-vous à Boss, ouvrez **Résidents & modèles**, puis **Supprimer tous les résidents**. Saisissez **SUPPRIMER** et confirmez. Cette action efface les résidents actifs et archivés, leurs modèles, les transmissions et les lignes de suivi Titan de la base active. Elle préserve vos comptes, mots de passe et paramètres. Aucun exemple n’est recréé au redémarrage. Le bouton individuel **Supprimer définitivement** reste disponible.
 
 La confirmation Titan conserve uniquement la ligne de suivi décrite dans la section précédente, sans texte ni observations. Les mentions « démo » ont déjà été retirées de l’interface. Le retrait de ces mentions ne certifie pas l’application pour des données de santé réelles. Les anciennes sauvegardes, les copies externes et certains événements techniques non cliniques ne sont pas effacés par le vidage : il ne s’agit pas d’une garantie d’absence de toute trace sur les supports.
+
+## Retirer une ligne de suivi Titan — version 2.3.1
+
+Avec votre compte administrateur : **Kiné → Transmissions à saisir dans Titan → Voir l’historique → Voir le suivi → Supprimer cette ligne de suivi**, puis confirmez. La ligne disparaît de la base active et du compteur des saisies. Le résident, ses modèles et les autres transmissions restent inchangés. Cette action ne touche pas Titan et ne restaure aucun texte déjà effacé. Seule l’administratrice peut supprimer une ligne de suivi ; le serveur contrôle ce droit. Les anciennes sauvegardes ne sont pas modifiées et un événement technique sans le contenu est conservé dans l’audit.

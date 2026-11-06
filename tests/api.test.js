@@ -9,7 +9,7 @@ import {spawnSync} from 'node:child_process';
 import {backup,DatabaseSync} from 'node:sqlite';
 import {createApp} from '../backend/server.js';
 import {hashPassword} from '../backend/auth.js';
-import {seed,createTransmission,changeStatus,cancelTransmission,deleteResident} from '../src/domain.js';
+import {seed,createTransmission,changeStatus,cancelTransmission,deleteResident,deleteTitanSummary} from '../src/domain.js';
 
 test('private server: accounts, RBAC, synchronization, conflicts, restart, backup and outage',async()=>{
  const directory=mkdtempSync(path.join(tmpdir(),'infinity-api-'));let app,base,initialized=false;
@@ -50,7 +50,11 @@ test('private server: accounts, RBAC, synchronization, conflicts, restart, backu
  const events=(await request('/api/audit',{client:clients.admin})).data.events;assert.ok(events.some(e=>e.action==='transmission.cancel'));assert.ok(!JSON.stringify(events).includes('Transmission fictive'));
  const file=path.join(directory,'backup.sqlite');await backup(app.db,file);const saved=new DatabaseSync(file,{readOnly:true});assert.equal(JSON.parse(saved.prepare('SELECT data FROM state').get().data).transmissions[0].status,'Annulée');assert.equal(saved.prepare('PRAGMA integrity_check').get().integrity_check,'ok');saved.close();
  const restoredDir=path.join(directory,'restored');const restore=spawnSync(process.execPath,['scripts/restore.js',file,'--server-stopped'],{env:{...process.env,INFINITY_DATA_DIR:restoredDir},encoding:'utf8'});assert.equal(restore.status,0,restore.stderr);const restoredDb=new DatabaseSync(path.join(restoredDir,'demo.sqlite'));assert.equal(JSON.parse(restoredDb.prepare('SELECT data FROM state').get().data).transmissions[0].status,'Annulée');assert.equal(restoredDb.prepare('SELECT count(*) AS n FROM sessions').get().n,0);restoredDb.close();
- await stop();await assert.rejects(()=>fetch(base+'/api/state'));await start();const restored=(await request('/api/state',{client:clients.admin})).data;assert.equal(restored.state.transmissions[0].status,'Annulée');assert.equal(restored.state.transmissions[1].status,'Saisi sur Titan');assert.ok(!('finalText' in restored.state.transmissions[1]));assert.equal(restored.revision,state.revision);
+ await stop();await assert.rejects(()=>fetch(base+'/api/state'));await start();let restored=(await request('/api/state',{client:clients.admin})).data;assert.equal(restored.state.transmissions[0].status,'Annulée');assert.equal(restored.state.transmissions[1].status,'Saisi sur Titan');assert.ok(!('finalText' in restored.state.transmissions[1]));assert.equal(restored.revision,state.revision);
+ const summaryId=restored.state.transmissions.find(t=>t.status==='Saisi sur Titan').id,withoutSummary=deleteTitanSummary(restored.state,summaryId),summaryBody={revision:restored.revision,state:withoutSummary};
+ assert.equal((await request('/api/state',{method:'PUT',client:clients.secretariat,body:summaryBody})).code,403);
+ const summaryDeletion=await request('/api/state',{method:'PUT',client:clients.admin,body:summaryBody});assert.equal(summaryDeletion.code,200);restored=summaryDeletion.data;assert.ok(!restored.state.transmissions.some(t=>t.id===summaryId));assert.equal(restored.state.transmissions.length,1);
+ await stop();await start();assert.ok(!(await request('/api/state',{client:clients.admin})).data.state.transmissions.some(t=>t.id===summaryId));
  const secret=app.db.prepare('SELECT * FROM users WHERE id=?').get('secretariat');assert.equal((await request('/api/users',{method:'POST',client:clients.admin,body:{id:secret.id,username:secret.username,name:secret.name,role:secret.role,active:false}})).code,200);assert.equal((await request('/api/state',{client:clients.secretariat})).code,401);
  assert.equal(await new Promise((resolve,reject)=>{const r=http.get(base+'/',{headers:{host:'evil.invalid'}},response=>{response.resume();resolve(response.statusCode);});r.on('error',reject);}),403);
  const residentId=restored.state.residents[0].id,deleted=deleteResident(restored.state,residentId);

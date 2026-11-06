@@ -56,7 +56,7 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 
 ## Validation automatisée
 
-`npm test` exécute seize tests : neuf tests métier, six tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
+`npm test` exécute dix-sept tests : neuf tests métier, sept tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
 
 - Trois connexions individuelles, authentification exigée et absence de hachages dans les réponses.
 - Administration réservée, refus de création/annulation pour le secrétariat et contrôle serveur du texte historique.
@@ -72,3 +72,5 @@ Ces essais sont exécutés dans Chromium sur Linux. Ils ne constituent **pas** u
 Les nouveaux essais vérifient aussi la suppression en cascade réservée à l’administratrice, le refus des suppressions arbitraires, la disparition du texte après confirmation Titan, le nettoyage limité aux anciennes saisies et la persistance d’un effacement après redémarrage. Les parcours navigateur vérifient qu’annuler une confirmation ne supprime rien, puis que confirmer retire effectivement le résident et ses transmissions.
 
 Une nouvelle base privée est vide : aucun résident exemple n’est créé par le serveur. Les fixtures de résidents sont injectées explicitement dans les tests. Le vidage global est une action API réservée à admin, confirmée dans Boss par la saisie SUPPRIMER. Les tests vérifient que la liste reste vide au redémarrage et que les comptes et sessions restent utilisables.
+
+La version 2.3.1 permet à admin de supprimer une seule ligne de suivi déjà saisie sur Titan, avec confirmation UI. Le serveur refuse cette suppression pour les autres rôles et refuse de combiner cette action avec des modifications d’autres données. Le journal technique ne conserve pas le contenu supprimé.

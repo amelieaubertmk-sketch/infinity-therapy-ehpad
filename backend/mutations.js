@@ -1,5 +1,5 @@
 import {isDeepStrictEqual as equal} from 'node:util';
-import {activities,sectors,createTransmission,changeStatus,cancelTransmission,deleteResident,purgeTitan} from '../src/domain.js';
+import {activities,sectors,createTransmission,changeStatus,cancelTransmission,deleteResident,purgeTitan,deleteTitanSummary} from '../src/domain.js';
 const fail=m=>{throw Error(m);};
 function residentValid(r){if(typeof r.id!=='string'||!r.id||typeof r.code!=='string'||!r.code.trim()||r.code.length>30||!sectors.includes(r.sector)||typeof r.archived!=='boolean'||!r.templates||Object.keys(r.templates).length!==4||activities.some(a=>typeof r.templates[a]!=='string'||r.templates[a].length>20000))fail('Résident ou modèles invalides.');return {id:r.id,code:r.code.trim(),sector:r.sector,archived:r.archived,templates:r.templates};}
 // Apply one explicit change to a server-owned snapshot; never trust client historical fields.
@@ -9,6 +9,8 @@ export function mutation(current,proposed,user){
  const removed=current.residents.filter(r=>!proposed.residents.some(n=>n.id===r.id));
  if(removed.length){if(user.role!=='admin')fail('Suppression réservée à l’administratrice.');if(removed.length!==1||!equal(proposed,deleteResident(current,removed[0].id)))fail('Suppression invalide : seul le résident choisi et ses transmissions peuvent être effacés.');return {state:deleteResident(current,removed[0].id),action:'resident.delete',target:null};}
  if(!equal(current,purgeTitan(current))&&equal(proposed,purgeTitan(current))){if(user.role!=='admin')fail('Nettoyage réservé à l’administratrice.');return {state:purgeTitan(current),action:'transmission.purgeTitan',target:null};}
+ const removedSummaries=current.transmissions.filter(t=>!proposed.transmissions.some(n=>n.id===t.id));
+ if(removedSummaries.length===1&&removedSummaries[0].status==='Saisi sur Titan'){if(user.role!=='admin')fail('Suppression du suivi réservée à l’administratrice.');const next=deleteTitanSummary(current,removedSummaries[0].id);if(!equal(proposed,next))fail('Suppression invalide : seule la ligne choisie peut être retirée.');return {state:next,action:'transmission.summary.delete',target:null};}
  const residentsChanged=!equal(current.residents,proposed.residents),txChanged=!equal(current.transmissions,proposed.transmissions);
  if(residentsChanged&&txChanged||!residentsChanged&&!txChanged)fail('Une seule action est autorisée à la fois.');
  if(residentsChanged){if(user.role!=='admin')fail('Administration réservée à l’administratrice.');if(proposed.residents.length<current.residents.length||proposed.residents.length>current.residents.length+1)fail('Suppression de résident interdite.');

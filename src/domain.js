@@ -24,3 +24,5 @@ export function deleteResident(db,id){if(!db.residents.some(r=>r.id===id))throw 
 // Only these fields survive completion. Never spread the original payload here.
 export function titanSummary(t){return {id:t.id,residentId:t.residentId,residentCode:t.residentCode,sector:t.sector,date:t.date,activity:t.activity,practitioner:t.practitioner,status:statuses[2],notPerformed:!!t.notPerformed,validatedAt:t.validatedAt,completedAt:t.completedAt||t.statusHistory?.filter(h=>h.to===statuses[2]).at(-1)?.at||null};}
 export function purgeTitan(db){return {...db,transmissions:db.transmissions.map(t=>t.status===statuses[2]?titanSummary(t):t)};}
+
+export function deleteTitanSummary(db,id){const t=db.transmissions.find(t=>t.id===id);if(!t||t.status!==statuses[2])throw Error('Seule une ligne déjà saisie sur Titan peut être supprimée.');return {...db,transmissions:db.transmissions.filter(t=>t.id!==id)};}
