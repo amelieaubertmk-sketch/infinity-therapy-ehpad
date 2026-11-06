@@ -9,11 +9,11 @@ import {spawnSync} from 'node:child_process';
 import {backup,DatabaseSync} from 'node:sqlite';
 import {createApp} from '../backend/server.js';
 import {hashPassword} from '../backend/auth.js';
-import {createTransmission,changeStatus,cancelTransmission,deleteResident} from '../src/domain.js';
+import {seed,createTransmission,changeStatus,cancelTransmission,deleteResident} from '../src/domain.js';
 
 test('private server: accounts, RBAC, synchronization, conflicts, restart, backup and outage',async()=>{
- const directory=mkdtempSync(path.join(tmpdir(),'infinity-api-'));let app,base;
- async function start(){app=createApp({directory,origin:'http://localhost:31002'});app.server.listen(31002,'127.0.0.1');await once(app.server,'listening');base='http://localhost:'+app.server.address().port;}
+ const directory=mkdtempSync(path.join(tmpdir(),'infinity-api-'));let app,base,initialized=false;
+ async function start(){app=createApp({directory,origin:'http://localhost:31002'});if(!initialized){assert.equal(JSON.parse(app.db.prepare('SELECT data FROM state').get().data).residents.length,0);app.db.prepare('UPDATE state SET data=? WHERE id=1').run(JSON.stringify(seed()));initialized=true;}app.server.listen(31002,'127.0.0.1');await once(app.server,'listening');base='http://localhost:'+app.server.address().port;}
  async function stop(){await new Promise(r=>app.server.close(r));app.close();}
  async function request(route,{method='GET',body,client,origin='http://localhost:31002',csrf=true}={}){if(client?.role==='secretariat'&&body?.state)body={...body,state:{...body.state,residents:body.state.residents.map(r=>({...r,templates:{}}))}};const r=await fetch(base+route,{method,headers:{Connection:'close',Host:'localhost:31002',Origin:origin,'Content-Type':'application/json',...(client?{Cookie:client.cookie,...(csrf?{'X-CSRF-Token':client.csrf}:{})}:{})},...(body?{body:JSON.stringify(body)}:{})});return {code:r.status,data:await r.json(),cookie:r.headers.get('set-cookie')};}
  try{
@@ -57,6 +57,11 @@ test('private server: accounts, RBAC, synchronization, conflicts, restart, backu
  assert.equal((await request('/api/state',{method:'PUT',client:clients.kine,body:{revision:restored.revision,state:deleted}})).code,403);
  const deletion=await request('/api/state',{method:'PUT',client:clients.admin,body:{revision:restored.revision,state:deleted}});assert.equal(deletion.code,200);assert.equal(deletion.data.state.residents.length,5);assert.equal(deletion.data.state.transmissions.length,0);assert.ok(!app.db.prepare('SELECT data FROM state').get().data.includes(created.finalText));
  await stop();await start();assert.equal((await request('/api/state',{client:clients.admin})).data.state.residents.length,5);
+ const beforeClear=(await request('/api/state',{client:clients.admin})).data,usersBefore=app.db.prepare('SELECT count(*) AS n FROM users').get().n;
+ const clearBody={revision:beforeClear.revision,state:{...beforeClear.state,residents:[],transmissions:[]}};
+ assert.equal((await request('/api/state',{method:'PUT',client:clients.kine,body:clearBody})).code,403);
+ const cleared=await request('/api/state',{method:'PUT',client:clients.admin,body:clearBody});assert.equal(cleared.code,200);assert.equal(cleared.data.state.residents.length,0);assert.equal(cleared.data.state.transmissions.length,0);assert.equal(app.db.prepare('SELECT count(*) AS n FROM users').get().n,usersBefore);
+ await stop();await start();assert.equal((await request('/api/state',{client:clients.admin})).data.state.residents.length,0);assert.equal((await request('/api/me',{client:clients.admin})).code,200);
  console.log('Verified three separate accounts, server-side permissions, shared state, immutable history, stale-write rejection, CSRF, audit, restart, consistent backup and unavailable server.');
  }finally{if(app?.server.listening)await stop();rmSync(directory,{recursive:true,force:true});}
 });

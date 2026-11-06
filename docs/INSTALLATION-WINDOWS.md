@@ -244,6 +244,17 @@ Le serveur gère SIGINT/SIGTERM proprement. Windows peut cependant terminer de f
 
 PC éteint, en veille ou déconnecté : l’application est indisponible. Elle ne fonctionne pas hors ligne. Le formulaire ouvert conserve votre saisie à l’écran après une erreur réseau ; ne fermez pas et ne rechargez pas la page si vous souhaitez la garder. Après une réponse perdue, consultez l’historique avant de renvoyer une transmission.
 
+## Vider la liste des résidents déjà présents
+
+Sur une nouvelle installation privée, la liste est vide. Si vous avez déjà des résidents enregistrés, la mise à jour les préserve jusqu’à votre confirmation :
+
+1. Mettez à jour les fichiers du projet sur le PC puis redémarrez le serveur (étape 10).
+2. Connectez-vous avec votre compte administrateur et ouvrez **Boss → Résidents & modèles**.
+3. Cliquez sur **Supprimer tous les résidents**.
+4. Tapez exactement **SUPPRIMER**, puis confirmez.
+
+Les résidents, modèles, transmissions et lignes de suivi sont supprimés de la base active. Les comptes et mots de passe restent disponibles. Les sauvegardes antérieures ne sont pas modifiées. Ne supprimez pas le dossier des données ou le fichier SQLite : cela ferait perdre vos comptes.
+
 ## Après l’installation : ce qu’il faut garder
 
 - Votre lien privé HTTPS Tailscale, à mettre en favori sur les trois appareils.

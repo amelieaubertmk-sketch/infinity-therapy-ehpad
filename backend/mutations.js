@@ -5,6 +5,7 @@ function residentValid(r){if(typeof r.id!=='string'||!r.id||typeof r.code!=='str
 // Apply one explicit change to a server-owned snapshot; never trust client historical fields.
 export function mutation(current,proposed,user){
  if(!proposed||proposed.version!==1||!Array.isArray(proposed.residents)||!Array.isArray(proposed.transmissions))fail('Données invalides.');
+ if((current.residents.length||current.transmissions.length)&&!proposed.residents.length&&!proposed.transmissions.length){if(user.role!=='admin')fail('Suppression réservée à l’administratrice.');if(!equal(proposed,{...current,residents:[],transmissions:[]}))fail('Réinitialisation invalide.');return {state:{...current,residents:[],transmissions:[]},action:'residents.clear',target:null};}
  const removed=current.residents.filter(r=>!proposed.residents.some(n=>n.id===r.id));
  if(removed.length){if(user.role!=='admin')fail('Suppression réservée à l’administratrice.');if(removed.length!==1||!equal(proposed,deleteResident(current,removed[0].id)))fail('Suppression invalide : seul le résident choisi et ses transmissions peuvent être effacés.');return {state:deleteResident(current,removed[0].id),action:'resident.delete',target:null};}
  if(!equal(current,purgeTitan(current))&&equal(proposed,purgeTitan(current))){if(user.role!=='admin')fail('Nettoyage réservé à l’administratrice.');return {state:purgeTitan(current),action:'transmission.purgeTitan',target:null};}

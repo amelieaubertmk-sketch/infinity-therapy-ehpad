@@ -35,7 +35,7 @@ La base se trouve **hors du dépôt**, dans `%LOCALAPPDATA%\InfinityTherapyDemo`
 
 ## Démonstration publique et serveur privé
 
-GitHub Pages conserve la démonstration fictive locale, explicitement identifiée, sans compte et sans synchronisation. Elle n’accède jamais au serveur privé. L’adaptateur local est sélectionné uniquement sur un nom d’hôte se terminant par `.github.io`. Sur le PC privé, une panne réseau ne déclenche jamais de retour au stockage local. Les données déjà saisies dans l’ancienne démonstration restent dans son navigateur ; aucune importation automatique n’est effectuée. Les six résidents initiaux du serveur sont fictifs et leurs modèles sont modifiables depuis Boss.
+GitHub Pages conserve la démonstration fictive locale, explicitement identifiée, sans compte et sans synchronisation. Elle n’accède jamais au serveur privé. L’adaptateur local est sélectionné uniquement sur un nom d’hôte se terminant par `.github.io`. Sur le PC privé, une panne réseau ne déclenche jamais de retour au stockage local. Les données déjà saisies dans l’ancienne démonstration restent dans son navigateur ; aucune importation automatique n’est effectuée. Une nouvelle installation privée démarre sans résident. Ajoutez les résidents et leurs modèles depuis Boss. Les résidents exemples ne sont utilisés que dans les tests et l’ancienne interface publique locale.
 
 Pour la synchronisation, les trois utilisateurs doivent ouvrir **la même adresse HTTPS Tailscale du PC**, et non l’ancien lien GitHub Pages.
 
@@ -80,3 +80,9 @@ Sur le PC du cabinet, installez la nouvelle version du code selon [la procédure
 ## Présentation de l’interface — version 2.2.1
 
 Les mentions « démonstration » ont été retirées des écrans à la demande de l’utilisatrice. Les indications de stockage local ou de connexion au serveur restent visibles. Cette modification de présentation ne change ni les protections, ni les limites de sécurité documentées, et ne constitue pas une validation pour des données de santé réelles. Les données initiales restent fictives.
+
+## Liste du cabinet vide — version 2.3
+
+Les nouvelles bases privées démarrent avec une liste vide. Une mise à jour ne supprime pas silencieusement les données d’un cabinet existant : après avoir installé les nouveaux fichiers et redémarré le serveur, connectez-vous à Boss, ouvrez **Résidents & modèles**, puis **Supprimer tous les résidents**. Saisissez **SUPPRIMER** et confirmez. Cette action efface les résidents actifs et archivés, leurs modèles, les transmissions et les lignes de suivi Titan de la base active. Elle préserve vos comptes, mots de passe et paramètres. Aucun exemple n’est recréé au redémarrage. Le bouton individuel **Supprimer définitivement** reste disponible.
+
+La confirmation Titan conserve uniquement la ligne de suivi décrite dans la section précédente, sans texte ni observations. Les mentions « démo » ont déjà été retirées de l’interface. Le retrait de ces mentions ne certifie pas l’application pour des données de santé réelles. Les anciennes sauvegardes, les copies externes et certains événements techniques non cliniques ne sont pas effacés par le vidage : il ne s’agit pas d’une garantie d’absence de toute trace sur les supports.

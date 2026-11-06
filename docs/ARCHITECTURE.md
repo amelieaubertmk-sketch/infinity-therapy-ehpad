@@ -56,7 +56,7 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 
 ## Validation automatisée
 
-`npm test` exécute quinze tests : neuf tests métier, cinq tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
+`npm test` exécute seize tests : neuf tests métier, six tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
 
 - Trois connexions individuelles, authentification exigée et absence de hachages dans les réponses.
 - Administration réservée, refus de création/annulation pour le secrétariat et contrôle serveur du texte historique.
@@ -70,3 +70,5 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 Ces essais sont exécutés dans Chromium sur Linux. Ils ne constituent **pas** un test réel Windows, Safari iPhone, 5G, Tailscale, extinction Windows ou démarrage automatique. Les scripts PowerShell, le parcours de création du premier compte dans un terminal Windows et les règles Tailscale doivent encore être validés sur les équipements cibles. Aucun abonnement, appareil distant ou déploiement privé réel n’est configuré par les tests.
 
 Les nouveaux essais vérifient aussi la suppression en cascade réservée à l’administratrice, le refus des suppressions arbitraires, la disparition du texte après confirmation Titan, le nettoyage limité aux anciennes saisies et la persistance d’un effacement après redémarrage. Les parcours navigateur vérifient qu’annuler une confirmation ne supprime rien, puis que confirmer retire effectivement le résident et ses transmissions.
+
+Une nouvelle base privée est vide : aucun résident exemple n’est créé par le serveur. Les fixtures de résidents sont injectées explicitement dans les tests. Le vidage global est une action API réservée à admin, confirmée dans Boss par la saisie SUPPRIMER. Les tests vérifient que la liste reste vide au redémarrage et que les comptes et sessions restent utilisables.

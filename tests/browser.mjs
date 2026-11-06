@@ -109,6 +109,8 @@ try{
  accept=false;await deletionRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click();assert.equal(await deletionRow.count(),1);
  accept=true;await write(()=>deletionRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click());assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
  await page.reload();await page.getByRole('button',{name:'Boss',exact:true}).click();assert.equal(await page.locator('tbody tr').filter({hasText:'FIC.'}).count(),0);
+ await page.getByRole('button',{name:'Supprimer tous les résidents',exact:true}).click();await page.locator('#clear-confirmation').fill('ANNULER');await page.getByRole('button',{name:'Fermer',exact:true}).click();assert.equal(await page.locator('tbody tr').count(),6);
+ await page.getByRole('button',{name:'Supprimer tous les résidents',exact:true}).click();await page.locator('#clear-confirmation').fill('SUPPRIMER');await write(()=>page.getByRole('button',{name:'Confirmer la suppression de tous les résidents',exact:true}).click());assert.match(await page.locator('tbody').innerText(),/Aucun résident/);await page.reload();await page.getByRole('button',{name:'Boss',exact:true}).click();assert.match(await page.locator('tbody').innerText(),/Aucun résident/);
  assert.deepEqual(errors,[]);
  console.log('PASS: resident creation, 4 templates, validation, duplicates, non-performance, clipboard, Titan content deletion with preserved summary, pending status correction, history, archive/reactivate, snapshot preservation, persistence, filters, mobile layout; cancellation confirmation, reason, history, exclusion from pending, persistence; no browser errors.');
 }finally{await browser.close();}
