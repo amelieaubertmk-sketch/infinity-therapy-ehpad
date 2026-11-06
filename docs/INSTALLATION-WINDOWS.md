@@ -250,7 +250,7 @@ Cette procédure supprime **les données de l’application uniquement**, pas le
 
 ### A. Installer d’abord la dernière version du code
 
-Si votre interface n’affiche pas **Version 2.3.1**, mettez-la à jour avant de chercher le bouton de suppression. Si cette version est déjà présente, passez à B.
+Si votre interface n’affiche pas **Version 2.3.2**, mettez-la à jour avant de chercher le bouton de suppression. Si cette version est déjà présente, passez à B.
 
 1. Prévenez Alexandre et le secrétariat de ne pas saisir de nouvelles transmissions pendant l’opération.
 2. Arrêtez le serveur : dans la fenêtre PowerShell où il tourne, faites **Ctrl+C**. Si vous avez installé le démarrage automatique, arrêtez plutôt sa tâche depuis PowerShell avec les droits nécessaires :
@@ -289,7 +289,7 @@ Laissez cette fenêtre ouverte. Pour une installation avec tâche automatique, u
 Start-ScheduledTask -TaskName InfinityTherapyDemo
 ```
 
-8. Ouvrez votre adresse privée HTTPS Tailscale. Sur ordinateur, faites **Ctrl+Maj+R** pour recharger la page. Vérifiez **Version 2.3.1** en bas de l’écran. Les comptes et données sont encore là à ce stade : la mise à jour ne vide pas la liste à votre place.
+8. Ouvrez votre adresse privée HTTPS Tailscale. Sur ordinateur, faites **Ctrl+Maj+R** pour recharger la page. Vérifiez **Version 2.3.2** en bas de l’écran. Les comptes et données sont encore là à ce stade : la mise à jour ne vide pas la liste à votre place.
 
 **Ne relancez pas `configure-windows.ps1`. Ne supprimez ni `%LOCALAPPDATA%\InfinityTherapyDemo`, ni `demo.sqlite`, ni `config.json`.** Ces fichiers servent aussi aux comptes et à votre configuration.
 

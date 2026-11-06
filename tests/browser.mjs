@@ -19,6 +19,8 @@ try{
  await write(()=>page.getByRole('button',{name:'Enregistrer le résident'}).click());
  assert.equal(await page.locator('tbody tr').count(),7);
  await page.getByRole('button',{name:'Kiné',exact:true}).click();
+ await page.locator('#resident-query').fill(' fiC. ');assert.equal(await page.locator('#resident option:checked').innerText(),'FIC. · Maisonnée');assert.equal(await page.locator('[data-sector="Maisonnée"]').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('#text').inputValue(),'Marche fictive personnalisée.');assert.equal(await page.locator('#resident-query').evaluate(el=>el===document.activeElement),true);await page.locator('#resident-query').press('Enter');assert.equal(await page.locator('#toast.visible').filter({hasText:'Transmission enregistrée'}).count(),0);
+ await page.locator('#resident-query').fill('zzz');assert.equal(await page.locator('#resident').inputValue(),'');assert.equal(await page.locator('#text').inputValue(),'');assert.match(await page.locator('#resident-search-hint').innerText(),/Aucun résident actif/);
  await page.getByRole('button',{name:'Maisonnée',exact:true}).click();
  await page.locator('#resident').selectOption({label:'FIC.'});
  assert.equal(await page.locator('#text').inputValue(),'Marche fictive personnalisée.');

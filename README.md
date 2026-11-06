@@ -91,3 +91,7 @@ La confirmation Titan conserve uniquement la ligne de suivi décrite dans la sec
 ## Retirer une ligne de suivi Titan — version 2.3.1
 
 Avec votre compte administrateur : **Kiné → Transmissions à saisir dans Titan → Voir l’historique → Voir le suivi → Supprimer cette ligne de suivi**, puis confirmez. La ligne disparaît de la base active et du compteur des saisies. Le résident, ses modèles et les autres transmissions restent inchangés. Cette action ne touche pas Titan et ne restaure aucun texte déjà effacé. Seule l’administratrice peut supprimer une ligne de suivi ; le serveur contrôle ce droit. Les anciennes sauvegardes ne sont pas modifiées et un événement technique sans le contenu est conservé dans l’audit.
+
+## Recherche rapide du résident — version 2.3.2
+
+Dans le formulaire de transmission, tapez les trois premières lettres du code dans **Rechercher un résident**. La recherche parcourt les résidents actifs de tous les secteurs, sans tenir compte des majuscules, accents, espaces ou points. Un résultat unique est sélectionné automatiquement à partir de trois caractères utiles, le bon secteur est activé et le modèle de l’activité est affiché. Si plusieurs résidents correspondent, choisissez la bonne ligne dans le menu, qui indique le secteur. Les résidents archivés sont exclus. Aucun résultat laisse la sélection vide ; la touche Entrée dans ce champ ne valide jamais une transmission. Cliquer sur un secteur remet la recherche à zéro et affiche sa liste complète.
