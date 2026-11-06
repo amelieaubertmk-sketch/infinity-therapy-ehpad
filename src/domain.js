@@ -26,3 +26,5 @@ export function titanSummary(t){return {id:t.id,residentId:t.residentId,resident
 export function purgeTitan(db){return {...db,transmissions:db.transmissions.map(t=>t.status===statuses[2]?titanSummary(t):t)};}
 
 export function deleteTitanSummary(db,id){const t=db.transmissions.find(t=>t.id===id);if(!t||t.status!==statuses[2])throw Error('Seule une ligne déjà saisie sur Titan peut être supprimée.');return {...db,transmissions:db.transmissions.filter(t=>t.id!==id)};}
+
+export function deleteCancelledTransmission(db,id){const t=db.transmissions.find(t=>t.id===id);if(!t||t.status!=='Annulée')throw Error('Seule une transmission annulée peut être supprimée.');return {...db,transmissions:db.transmissions.filter(t=>t.id!==id)};}

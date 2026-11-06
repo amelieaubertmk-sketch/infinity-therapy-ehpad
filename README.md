@@ -95,3 +95,7 @@ Avec votre compte administrateur : **Kiné → Transmissions à saisir dans Tita
 ## Recherche rapide du résident — version 2.3.2
 
 Dans le formulaire de transmission, tapez les trois premières lettres du code dans **Rechercher un résident**. La recherche parcourt les résidents actifs de tous les secteurs, sans tenir compte des majuscules, accents, espaces ou points. Un résultat unique est sélectionné automatiquement à partir de trois caractères utiles, le bon secteur est activé et le modèle de l’activité est affiché. Si plusieurs résidents correspondent, choisissez la bonne ligne dans le menu, qui indique le secteur. Les résidents archivés sont exclus. Aucun résultat laisse la sélection vide ; la touche Entrée dans ce champ ne valide jamais une transmission. Cliquer sur un secteur remet la recherche à zéro et affiche sa liste complète.
+
+## Supprimer une transmission annulée — version 2.3.3
+
+Avec le compte administrateur, ouvrez **Kiné → Transmissions à saisir dans Titan → Voir l’historique**, puis **Ouvrir** sur la ligne **Annulée**. Cliquez sur **Supprimer définitivement cette transmission annulée** et confirmez. La ligne, son contenu et son motif sont retirés de la base active ; le résident, ses modèles et les autres transmissions restent inchangés. Les sauvegardes antérieures restent inchangées et un événement technique sans contenu est conservé dans l’audit. Aucun changement n’est effectué dans Titan.

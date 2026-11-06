@@ -105,6 +105,8 @@ try{
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  await page.locator('#filter-status').selectOption('Annulée');
  assert.equal(await page.locator('tbody tr').count(),1);
+ await page.locator('tbody tr').getByRole('button',{name:'Ouvrir',exact:true}).click();accept=false;await page.locator('#delete-cancelled').click();assert.ok(await page.locator('#delete-cancelled').isVisible());accept=true;await write(()=>page.locator('#delete-cancelled').click());assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique'}).click();await page.locator('#filter-status').selectOption('Annulée');assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);
+
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  await page.getByRole('button',{name:'Actifs',exact:true}).click();
  const deletionRow=page.locator('tbody tr').filter({hasText:'FIC.'});

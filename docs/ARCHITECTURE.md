@@ -56,7 +56,7 @@ La tâche planifiée Windows lance le serveur sous le compte configuré, à priv
 
 ## Validation automatisée
 
-`npm test` exécute dix-sept tests : neuf tests métier, sept tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
+`npm test` exécute dix-huit tests : neuf tests métier, huit tests de conservation/suppression et migration serveur et un scénario d’intégration API regroupant :
 
 - Trois connexions individuelles, authentification exigée et absence de hachages dans les réponses.
 - Administration réservée, refus de création/annulation pour le secrétariat et contrôle serveur du texte historique.
