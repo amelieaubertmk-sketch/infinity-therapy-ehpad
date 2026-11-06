@@ -244,16 +244,89 @@ Le serveur gère SIGINT/SIGTERM proprement. Windows peut cependant terminer de f
 
 PC éteint, en veille ou déconnecté : l’application est indisponible. Elle ne fonctionne pas hors ligne. Le formulaire ouvert conserve votre saisie à l’écran après une erreur réseau ; ne fermez pas et ne rechargez pas la page si vous souhaitez la garder. Après une réponse perdue, consultez l’historique avant de renvoyer une transmission.
 
-## Vider la liste des résidents déjà présents
+## Vider les données Infinity Therapy sur votre PC
 
-Sur une nouvelle installation privée, la liste est vide. Si vous avez déjà des résidents enregistrés, la mise à jour les préserve jusqu’à votre confirmation :
+Cette procédure supprime **les données de l’application uniquement**, pas le contenu de votre ordinateur. Elle conserve les comptes d’Amélie, d’Alexandre et du secrétariat, leurs mots de passe et la connexion Tailscale.
 
-1. Mettez à jour les fichiers du projet sur le PC puis redémarrez le serveur (étape 10).
-2. Connectez-vous avec votre compte administrateur et ouvrez **Boss → Résidents & modèles**.
+### A. Installer d’abord la dernière version du code
+
+Si votre interface n’affiche pas **Version 2.3**, mettez-la à jour avant de chercher le bouton de suppression. Si cette version est déjà présente, passez à B.
+
+1. Prévenez Alexandre et le secrétariat de ne pas saisir de nouvelles transmissions pendant l’opération.
+2. Arrêtez le serveur : dans la fenêtre PowerShell où il tourne, faites **Ctrl+C**. Si vous avez installé le démarrage automatique, arrêtez plutôt sa tâche depuis PowerShell avec les droits nécessaires :
+
+```powershell
+Stop-ScheduledTask -TaskName InfinityTherapyDemo
+```
+
+Cette commande concerne uniquement les installations avec tâche planifiée. Ne la lancez pas si vous démarrez simplement le serveur à la main.
+
+3. Ouvrez [le dépôt Infinity Therapy](https://github.com/amelieaubertmk-sketch/infinity-therapy-ehpad), cliquez sur **Code → Download ZIP**, puis **Extraire tout** sur le ZIP téléchargé.
+4. Retrouvez le dossier actuel du code : celui qui contient `server.js`, `package.json` et `scripts`. Si vous avez gardé l’emplacement initial, il est dans Documents, sous `infinity-therapy-ehpad-main`. Pour ouvrir le dossier réellement enregistré dans votre configuration, copiez cette commande dans PowerShell :
+
+```powershell
+explorer.exe ((Get-Content "$env:LOCALAPPDATA\InfinityTherapyDemo\config.json" -Raw | ConvertFrom-Json).project)
+```
+
+5. Dans le nouveau dossier extrait, ouvrez le sous-dossier qui contient directement `server.js`. Sélectionnez **son contenu**, copiez-le dans le dossier actuel du code et choisissez **Remplacer les fichiers dans la destination**. Ne placez pas simplement un second dossier `infinity-therapy-ehpad-main` à l’intérieur du premier. Gardez le chemin actuel du projet.
+6. Dans PowerShell ouvert dans ce dossier, débloquez les scripts téléchargés après vérification de leur provenance :
+
+```powershell
+Get-ChildItem .\scripts\*.ps1 | Unblock-File
+```
+
+7. Redémarrez le serveur **selon votre méthode habituelle**, une seule fois :
+
+Pour un démarrage manuel :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy RemoteSigned -File .\scripts\start-windows.ps1
+```
+
+Laissez cette fenêtre ouverte. Pour une installation avec tâche automatique, utilisez plutôt :
+
+```powershell
+Start-ScheduledTask -TaskName InfinityTherapyDemo
+```
+
+8. Ouvrez votre adresse privée HTTPS Tailscale. Sur ordinateur, faites **Ctrl+Maj+R** pour recharger la page. Vérifiez **Version 2.3** en bas de l’écran. Les comptes et données sont encore là à ce stade : la mise à jour ne vide pas la liste à votre place.
+
+**Ne relancez pas `configure-windows.ps1`. Ne supprimez ni `%LOCALAPPDATA%\InfinityTherapyDemo`, ni `demo.sqlite`, ni `config.json`.** Ces fichiers servent aussi aux comptes et à votre configuration.
+
+### B. Effacer la liste actuelle depuis Boss
+
+1. Connectez-vous avec **amelie**, votre compte administrateur.
+2. Ouvrez **Boss → Résidents & modèles**.
 3. Cliquez sur **Supprimer tous les résidents**.
-4. Tapez exactement **SUPPRIMER**, puis confirmez.
+4. Lisez le nombre de résidents et de transmissions ou lignes de suivi annoncé.
+5. Tapez exactement **SUPPRIMER**, puis cliquez sur **Confirmer la suppression de tous les résidents**.
+6. Attendez le message **« Liste vidée. Vos comptes sont conservés. »**. Si un message réseau ou de conflit apparaît, l’effacement n’est pas confirmé : vérifiez les données avant de réessayer.
 
-Les résidents, modèles, transmissions et lignes de suivi sont supprimés de la base active. Les comptes et mots de passe restent disponibles. Les sauvegardes antérieures ne sont pas modifiées. Ne supprimez pas le dossier des données ou le fichier SQLite : cela ferait perdre vos comptes.
+Cette action efface de la base active tous les résidents, y compris archivés, leurs quatre modèles, les transmissions encore présentes et les lignes de suivi Titan. Elle n’est pas réversible depuis l’interface. Vous pourrez ensuite ajouter de nouveaux résidents via **Ajouter un résident**.
+
+### C. Vérifier que le nettoyage a fonctionné
+
+- Dans Boss, le compteur des résidents actifs doit être à **0**.
+- Les listes **Actifs** et **Archives** doivent être vides.
+- Le suivi des transmissions doit être vide.
+- Votre compte et ceux d’Alexandre et du secrétariat doivent toujours exister dans **Utilisateurs**.
+- Rechargez la page : les résidents ne doivent pas réapparaître. Ils ne seront pas recréés automatiquement au redémarrage du serveur.
+- Demandez aux autres utilisateurs de fermer les anciennes fenêtres de détail et de recharger leurs pages.
+
+### D. Ce qui reste après une nouvelle saisie Titan
+
+Une fois cette version installée, le fonctionnement est le suivant :
+
+1. La transmission est conservée tant qu’elle est **À saisir** ou **En cours de saisie**.
+2. **Copier** n’efface rien et ne change pas le statut.
+3. Après la saisie dans Titan, cliquez sur **Marquer comme saisi sur Titan** et confirmez l’avertissement.
+4. Après confirmation du serveur, le **texte final, le texte de séance, l’observation, le motif éventuel et les autres champs de contenu de cette transmission sont retirés de la base active**. Il ne s’agit pas seulement de masquer leur affichage.
+5. Dans **Voir l’historique**, seule une ligne de suivi reste, par exemple : **05/11/2026 · ARB. · Premier étage · Marche · Saisi sur Titan**. Le praticien et les dates techniques de validation/confirmation restent pour le suivi ; une séance non réalisée garde un indicateur sans son motif.
+6. **Voir le suivi** n’affiche aucun contenu et ne propose ni copie, ni réouverture du statut. Le contenu ne peut pas être récupéré depuis cette ligne.
+
+Les modèles réutilisables de la bibliothèque du résident sont distincts des textes de séance : ils restent disponibles pour préparer les prochaines séances. Supprimer le résident efface aussi ses modèles et ses lignes de suivi de la base active.
+
+**Limites de cette confirmation :** les anciennes sauvegardes, les copies collées dans Titan, le presse-papiers, les exports éventuels et les anciennes pages encore ouvertes ne sont pas effacés par cette opération. Des événements techniques d’audit sans le texte des transmissions sont conservés. SQLite efface le contenu actif et tente de tronquer son journal après l’opération, mais cela ne garantit pas l’absence de toute trace physique sur le disque, les snapshots Windows ou les supports de sauvegarde. Si vous aviez créé des sauvegardes auparavant, leur nettoyage est une opération distincte : ne supprimez pas des fichiers au hasard et ne confondez pas une sauvegarde avec la base en service.
 
 ## Après l’installation : ce qu’il faut garder
 
