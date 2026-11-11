@@ -1,5 +1,7 @@
 # Infinity Therapy — Transmissions EHPAD
 
+**Version corrigée 2.5.1 — page blanche après mise à jour partielle** : [réparation Windows avec sauvegarde](docs/MISE-A-JOUR-2.5.1.md). Remplacer tous les dossiers de code concernés puis redémarrer le serveur ; conserver la base et `config.json`.
+
 **Version complète 2.5.0** : [installation Windows et sauvegarde](docs/MISE-A-JOUR-2.5.0.md), [guide Bilans résidents](docs/BILANS-RESIDENTS.md), [tests et fichiers livrés](docs/VALIDATION-2.5.0.md). Cette livraison intègre les ajustements ergonomiques et les bilans ; aucune installation intermédiaire 2.4.1 n’est nécessaire.
 
 L’application existante évolue en **démonstration multiutilisateur privée**, avec Node.js 24 LTS, SQLite sur le PC Windows 11 et accès HTTPS via Tailscale Serve. Aucun hébergement cloud de la base, aucune ouverture de port sur la box, aucun Docker et aucune dépendance npm de production.
@@ -117,3 +119,7 @@ Dans les transmissions à saisir, conserver les badges de dates et réserver sé
 Nouvel espace principal indépendant : bilans initiaux, réévaluations, brouillons serveur, tests avec états de réalisation, modèles locaux de diagnostic et projet à valider, historique immuable, comparaisons et PDF local A4 avec polices embarquées. Les bilans sont inclus dans les sauvegardes SQLite existantes. Aucun changement de comptes, de praticiens, de statuts Titan, de Tailscale ou de démarrage Windows.
 
 Les tests navigateur du module sont dans `tests/assessments-browser.mjs` ; les tests ergonomiques dans `tests/ergonomics-browser.mjs`. Voir le rapport 2.5.0 pour les commandes et les limites, dont la vérification nécessaire sur iPhone/Safari physique.
+
+## Version 2.5.1 — démarrage après mise à jour partielle
+
+Les imports principaux sont contrôlés ; un échec affiche une aide au lieu d’un écran vide. Les bilans sont chargés à l’ouverture de leur onglet : un module absent ne bloque plus les transmissions. Tous les imports du navigateur utilisent la même référence de version pour éviter les anciens modules en cache. Aucun changement de données, d’autorisations ou de configuration Windows/Tailscale. Test de régression : `PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/startup-browser.mjs`.

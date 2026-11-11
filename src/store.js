@@ -1,7 +1,7 @@
 // Public GitHub Pages remains an explicitly separate, fictitious local demo.
 // The private server never falls back to browser storage, even on network failure.
 export const demo=location.hostname.endsWith('.github.io');
-const local=demo?await import('./demo-store.js?v=titansummary1'):null;
+const local=demo?await import('./demo-store.js?v=2.5.1'):null;
 export const key=local?.key;
 let csrf='',revision=0;
 export let user=null;

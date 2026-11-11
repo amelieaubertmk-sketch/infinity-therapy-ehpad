@@ -1,6 +1,6 @@
-import {today} from './domain.js?v=titansummary1';
-import {request,user} from './store.js?v=titansummary1';
-import {jointFields,jointNarrative,walkingFields,anamnesisFields,testDefinitions,examStates,balanceItems,gaitItems,emptyClinical,generateDiagnosis,generateProject,comparison,tinettiScores} from './assessments-domain.js?v=2.5.0';
+import {today} from './domain.js?v=2.5.1';
+import {request,user} from './store.js?v=2.5.1';
+import {jointFields,jointNarrative,walkingFields,anamnesisFields,testDefinitions,examStates,balanceItems,gaitItems,emptyClinical,generateDiagnosis,generateProject,comparison,tinettiScores} from './assessments-domain.js?v=2.5.1';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let activeUserId=null,lastAutoDiagnosis='',lastAutoProject='';
 let records=[],current=null,residentFilter='',residents=[],host,notify,dirty=false,inFlight=false,generation=0;
