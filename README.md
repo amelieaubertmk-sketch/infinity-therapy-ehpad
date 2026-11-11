@@ -99,3 +99,9 @@ Dans le formulaire de transmission, tapez les trois premières lettres du code d
 ## Supprimer une transmission annulée — version 2.3.3
 
 Avec le compte administrateur, ouvrez **Kiné → Transmissions à saisir dans Titan → Voir l’historique**, puis **Ouvrir** sur la ligne **Annulée**. Cliquez sur **Supprimer définitivement cette transmission annulée** et confirmez. La ligne, son contenu et son motif sont retirés de la base active ; le résident, ses modèles et les autres transmissions restent inchangés. Les sauvegardes antérieures restent inchangées et un événement technique sans contenu est conservé dans l’audit. Aucun changement n’est effectué dans Titan.
+
+## Version 2.4.0 — sélection, export local et corbeille
+
+Consultez [la procédure de mise à jour Windows avec sauvegarde et retour arrière](docs/MISE-A-JOUR-2.4.md). Sélection multiple dans les listes et l’historique, export Excel sans texte médical, suppression groupée admin vers une corbeille récupérable et auditée, tri chronologique et repères de dates, filtre et regroupement par kiné. Les compteurs incluent désormais les séances non réalisées de façon cohérente. Aucun effacement automatique de la corbeille. Aucun changement de configuration Tailscale.
+
+Tests complémentaires navigateur : `PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/bulk-browser.mjs`. Les données et comptes du cabinet ne sont pas utilisés par ces tests.

@@ -33,14 +33,14 @@ try{
  await write(()=>page.getByRole('button',{name:'Enregistrer la non-réalisation'}).click());
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
- await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
  assert.match(await page.locator('#final-text').innerText(),/Observation complémentaire\nObservation fictive de test/);
  await page.getByRole('button',{name:'Copier la transmission',exact:true}).click();
  assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/Marche fictive personnalisée/);
  assert.equal(await page.locator('#new-status').inputValue(),'À saisir');
  await page.locator('#new-status').selectOption('En cours de saisie');
  await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
- await page.locator('tbody tr').last().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
  accept=false;await page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();assert.ok(await page.locator('#mark-done').isVisible());accept=true;
  await write(()=>page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
@@ -64,7 +64,7 @@ try{
  await page.locator('#resident').selectOption({label:'FIC.'});
  assert.equal(await page.locator('#text').inputValue(),'Nouveau modèle fictif.');
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- await page.locator('tbody tr').filter({hasText:'À saisir'}).last().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasText:'À saisir',hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
  assert.match(await page.locator('#final-text').innerText(),/Marche fictive personnalisée/);
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();
@@ -81,7 +81,7 @@ try{
  await page.screenshot({path:'/tmp/infinity-desktop.png',fullPage:true});
 
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- await page.locator('tbody tr').last().getByRole('button',{name:'Annuler',exact:true}).click();
+ await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Annuler',exact:true}).click();
  assert.ok(await page.locator('#cancel-reason').evaluate(el=>el===document.activeElement));
  await page.locator('#cancel-reason').fill('Validation par erreur fictive.');
  accept=false;

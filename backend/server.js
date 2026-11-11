@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {exportWorkbook} from './xlsx.js';
 import {isDeepStrictEqual} from 'node:util';
 import {technicalLog} from './log.js';
 import {readFile} from 'node:fs/promises';
@@ -36,6 +37,24 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  if(route==='/api/me'&&req.method==='GET')return json(200,{user:publicUser(user),csrf:user.csrf});
  if(route==='/api/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(user.token);audit(db,user.id,'logout');return json(200,{ok:true},{'Set-Cookie':cookie('',true)});}
  const visible=snap=>user.role==='secretariat'?{...snap,state:{...snap.state,residents:snap.state.residents.map(r=>({...r,templates:{}}))}}:snap;
+ if(route==='/api/trash'&&req.method==='GET'){
+ if(user.role!=='admin')return json(403,{error:'Administration réservée.'});
+ return json(200,{entries:db.prepare('SELECT * FROM trash ORDER BY deleted_at DESC').all().map(e=>{const t=JSON.parse(e.data);return {id:e.id,deletedAt:e.deleted_at,residentCode:t.residentCode,date:t.date,practitioner:t.practitioner};})});}
+ if(['/api/transmissions/trash','/api/transmissions/restore','/api/transmissions/export'].includes(route)&&req.method==='POST'){
+ const exporting=route.endsWith('/export'),restoring=route.endsWith('/restore');
+ if(!exporting&&user.role!=='admin')return json(403,{error:'Suppression et restauration réservées à l’administratrice.'});
+ if(!Array.isArray(body.ids)||!body.ids.length||body.ids.length>1000||body.ids.some(id=>typeof id!=='string')||new Set(body.ids).size!==body.ids.length)return json(400,{error:'Sélection invalide (1 à 1000 lignes).'});
+ if(!exporting&&body.confirmation!==(restoring?'RESTAURER':'CORBEILLE'))return json(400,{error:'Confirmation requise.'});
+ db.exec('BEGIN IMMEDIATE');try{
+ const current=snapshot(db);if(body.revision!==current.revision){db.exec('ROLLBACK');return json(409,{error:'Données modifiées : rechargez puis vérifiez la sélection.'});}
+ const rows=body.ids.map(id=>restoring?JSON.parse(db.prepare('SELECT data FROM trash WHERE id=?').get(id)?.data||'null'):current.state.transmissions.find(t=>t.id===id));
+ if(rows.some(t=>!t)||(restoring&&rows.some(t=>!current.state.residents.some(r=>r.id===t.residentId)||current.state.transmissions.some(x=>x.id===t.id)))){db.exec('ROLLBACK');return json(400,{error:'Sélection indisponible ou résident supprimé. Aucune modification.'});}
+ if(exporting){const file=exportWorkbook(rows);audit(db,user.id,'transmission.export',JSON.stringify(body.ids));db.exec('COMMIT');return json(200,{file:file.toString('base64')});}
+ const at=new Date().toISOString();for(const t of rows){if(restoring)db.prepare('DELETE FROM trash WHERE id=?').run(t.id);else db.prepare('INSERT INTO trash VALUES(?,?,?,?)').run(t.id,at,user.id,JSON.stringify(t));audit(db,user.id,restoring?'transmission.restore':'transmission.trash',t.id);}
+ const next={...current.state,transmissions:restoring?[...current.state.transmissions,...rows]:current.state.transmissions.filter(t=>!body.ids.includes(t.id))};
+ db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(next));db.exec('COMMIT');return json(200,visible(snapshot(db)));
+ }catch{if(db.isTransaction)db.exec('ROLLBACK');return json(400,{error:'Opération refusée. Aucune modification.'});}}
+
  if(route==='/api/state'&&req.method==='GET')return json(200,visible(snapshot(db)));
  if(route==='/api/state'&&req.method==='PUT'){
  db.exec('BEGIN IMMEDIATE');try{const current=snapshot(db);if(body.revision!==current.revision){db.exec('ROLLBACK');return json(409,{error:'Une autre personne a modifié les données. Rechargez les données avant de réessayer ; votre formulaire est conservé.'});}let proposed=body.state;if(user.role==='secretariat'){if(!isDeepStrictEqual(body.state?.residents,visible(current).state.residents)){db.exec('ROLLBACK');return json(403,{error:'Modification des résidents interdite.'});}proposed={...body.state,residents:current.state.residents};}const result=mutation(current.state,proposed,user);db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(result.state));audit(db,user.id,result.action,result.target);db.exec('COMMIT');if(result.action==='transmission.cancelled.delete'||result.action==='transmission.summary.delete'||result.action==='residents.clear'||result.action==='resident.delete'||result.action==='transmission.completedContentDeleted'||result.action==='transmission.purgeTitan'){try{db.exec('PRAGMA wal_checkpoint(TRUNCATE)');}catch{technicalLog('checkpoint.deferred');}}return json(200,visible(snapshot(db)));}catch(e){db.exec('ROLLBACK');return json(/réservée/.test(e.message)?403:400,{error:e.message});}}
