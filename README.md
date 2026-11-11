@@ -1,5 +1,7 @@
 # Infinity Therapy — Transmissions EHPAD
 
+**Version complète 2.5.0** : [installation Windows et sauvegarde](docs/MISE-A-JOUR-2.5.0.md), [guide Bilans résidents](docs/BILANS-RESIDENTS.md), [tests et fichiers livrés](docs/VALIDATION-2.5.0.md). Cette livraison intègre les ajustements ergonomiques et les bilans ; aucune installation intermédiaire 2.4.1 n’est nécessaire.
+
 L’application existante évolue en **démonstration multiutilisateur privée**, avec Node.js 24 LTS, SQLite sur le PC Windows 11 et accès HTTPS via Tailscale Serve. Aucun hébergement cloud de la base, aucune ouverture de port sur la box, aucun Docker et aucune dépendance npm de production.
 
 **Exclusivement des données fictives. Cette version n’est pas autorisée à traiter des données médicales réelles et ne revendique aucune conformité RGPD ou HDS.**
@@ -105,3 +107,13 @@ Avec le compte administrateur, ouvrez **Kiné → Transmissions à saisir dans T
 Consultez [la procédure de mise à jour Windows avec sauvegarde et retour arrière](docs/MISE-A-JOUR-2.4.md). Sélection multiple dans les listes et l’historique, export Excel sans texte médical, suppression groupée admin vers une corbeille récupérable et auditée, tri chronologique et repères de dates, filtre et regroupement par kiné. Les compteurs incluent désormais les séances non réalisées de façon cohérente. Aucun effacement automatique de la corbeille. Aucun changement de configuration Tailscale.
 
 Tests complémentaires navigateur : `PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/bulk-browser.mjs`. Les données et comptes du cabinet ne sont pas utilisés par ces tests.
+
+## Ajustements ergonomiques préparés puis intégrés à la version 2.5.0
+
+Dans les transmissions à saisir, conserver les badges de dates et réserver sélection, export et corbeille à l’historique. L’historique affiche des dates neutres. Le regroupement distingue AMÉLIE (rose) et ALEXANDRE (bleu), avec le nombre de transmissions filtrées. Les autorisations, données et règles de conservation restent inchangées. Voir [la mise à jour Windows 11 et les tests](docs/MISE-A-JOUR-2.4.1.md).
+
+## Version 2.5.0 — bilans résidents et interface des transmissions
+
+Nouvel espace principal indépendant : bilans initiaux, réévaluations, brouillons serveur, tests avec états de réalisation, modèles locaux de diagnostic et projet à valider, historique immuable, comparaisons et PDF local A4 avec polices embarquées. Les bilans sont inclus dans les sauvegardes SQLite existantes. Aucun changement de comptes, de praticiens, de statuts Titan, de Tailscale ou de démarrage Windows.
+
+Les tests navigateur du module sont dans `tests/assessments-browser.mjs` ; les tests ergonomiques dans `tests/ergonomics-browser.mjs`. Voir le rapport 2.5.0 pour les commandes et les limites, dont la vérification nécessaire sur iPhone/Safari physique.

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import {initializeAssessments,assessmentRoute} from './assessments.js';
 import {exportWorkbook} from './xlsx.js';
 import {isDeepStrictEqual} from 'node:util';
 import {technicalLog} from './log.js';
@@ -12,7 +13,7 @@ import {mutation} from './mutations.js';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const security={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
 export function createApp({directory,origin='http://localhost:3000'}={}){
- const allowed=new URL(origin);if(allowed.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(allowed.hostname))throw Error('HTTPS requis hors localhost.');const db=database(directory);let closed=false,activeLogins=0;
+ const allowed=new URL(origin);if(allowed.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(allowed.hostname))throw Error('HTTPS requis hors localhost.');const db=database(directory);initializeAssessments(db);let closed=false,activeLogins=0;
  const cookie=(token,expire=false)=>`infinity_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${expire?0:28800}${allowed.protocol==='https:'?'; Secure':''}`;
  const server=http.createServer(async(req,res)=>{
  const json=(code,data,headers={})=>{res.writeHead(code,{...security,'Content-Type':'application/json; charset=utf-8',...headers});res.end(JSON.stringify(data));};
@@ -20,7 +21,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  const backendHosts=[allowed.host,`127.0.0.1:${req.socket.localPort}`,`localhost:${req.socket.localPort}`];
  if(!backendHosts.includes(req.headers.host))return json(403,{error:'Hôte non autorisé.'});
  const url=new URL(req.url,allowed),route=url.pathname;
- if(!route.startsWith('/api/')){const files={'/':'index.html','/index.html':'index.html','/src/app.js':'src/app.js','/src/store.js':'src/store.js','/src/demo-store.js':'src/demo-store.js','/src/domain.js':'src/domain.js','/src/style.css':'src/style.css'};if(!files[route]||req.method!=='GET')return json(404,{error:'Introuvable.'});const file=files[route];res.writeHead(200,{...security,'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'});res.end(await readFile(path.join(root,file)));return;}
+ if(!route.startsWith('/api/')){const files={'/':'index.html','/index.html':'index.html','/src/app.js':'src/app.js','/src/store.js':'src/store.js','/src/demo-store.js':'src/demo-store.js','/src/domain.js':'src/domain.js','/src/style.css':'src/style.css','/src/assessments.js':'src/assessments.js','/src/assessments-domain.js':'src/assessments-domain.js'};if(!files[route]||req.method!=='GET')return json(404,{error:'Introuvable.'});const file=files[route];res.writeHead(200,{...security,'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'});res.end(await readFile(path.join(root,file)));return;}
  if(!['GET','POST','PUT'].includes(req.method))return json(405,{error:'Méthode interdite.'});
  let body={};if(req.method!=='GET'){if(req.headers.origin!==allowed.origin||req.headers['content-type']?.split(';')[0]!=='application/json')return json(403,{error:'Origine ou format non autorisé.'});let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>2000000)return json(413,{error:'Requête trop volumineuse.'});}try{body=JSON.parse(text);}catch{return json(400,{error:'JSON invalide.'});}}
  if(route==='/api/login'&&req.method==='POST'){
@@ -34,6 +35,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  const fresh=db.prepare('SELECT * FROM users WHERE id=?').get(user.id);if(!fresh.active||fresh.password!==user.password)return json(401,{error:'Identifiants incorrects.'});db.prepare('DELETE FROM attempts WHERE key=?').run(key);const s=newSession(db,user.id);audit(db,user.id,'login');return json(200,{user:publicUser(user),csrf:s.csrf},{'Set-Cookie':cookie(s.token)});
  }
  const user=session(db,req);if(!user)return json(401,{error:'Connexion requise.'});if(req.method!=='GET'&&req.headers['x-csrf-token']!==user.csrf)return json(403,{error:'Session invalide. Reconnectez-vous.'});
+ if(assessmentRoute({db,user,route,method:req.method,body,json}))return;
  if(route==='/api/me'&&req.method==='GET')return json(200,{user:publicUser(user),csrf:user.csrf});
  if(route==='/api/logout'&&req.method==='POST'){db.prepare('DELETE FROM sessions WHERE token=?').run(user.token);audit(db,user.id,'logout');return json(200,{ok:true},{'Set-Cookie':cookie('',true)});}
  const visible=snap=>user.role==='secretariat'?{...snap,state:{...snap.state,residents:snap.state.residents.map(r=>({...r,templates:{}}))}}:snap;

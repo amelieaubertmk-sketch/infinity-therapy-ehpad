@@ -3,3 +3,10 @@
 .session-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:8px max(20px,calc((100vw - 1144px)/2));background:white;font-size:12px;color:#62736b}.login-container{max-width:540px;margin-top:50px}.login-container h1{margin-top:25px}.tabs{overflow-x:auto}.tabs button{flex-shrink:0}
 
 .session-age{display:inline-block;padding:5px 8px;border-radius:6px;color:#252525;font-weight:600}.session-age.today{background:#fff1a6}.session-age.yesterday{background:#ffd09b}.session-age.older{background:#ffc7c7}.session-age.future{background:#e6edf3}input[type=checkbox]{width:18px;min-height:18px;accent-color:var(--primary,#26776b)}
+
+/* Practitioner colors never replace the pending date badges. */
+.practitioner-heading.amelie th,.practitioner-row.amelie td{background:#FCE7F1;color:#252525}
+.practitioner-heading.alexandre th,.practitioner-row.alexandre td{background:#E2F1FF;color:#252525}
+.practitioner-heading th{font-weight:700;padding-top:14px;padding-bottom:14px}
+
+.assessment-test{border:1px solid #dce7e1;border-radius:8px;padding:12px;margin:10px 0}.assessment-test summary{font-weight:600;cursor:pointer}.assessment-test label{display:block;margin-top:10px}#assessments-panel textarea{min-height:90px}#assessments-panel h3{margin-top:28px}#assessments-panel .form-grid{margin:16px 0}#assessments-panel details{margin-top:12px}#assessments-panel button{margin:4px}header .nav{flex-wrap:wrap}
