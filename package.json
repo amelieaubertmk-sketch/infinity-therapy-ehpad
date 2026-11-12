@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/domain.test.js tests/api.test.js tests/retention.test.js tests/bulk.test.js tests/assessments.test.js tests/assessments-compact.test.js tests/static-imports.test.js tests/bilans-load.test.js",
+    "test": "node --test tests/domain.test.js tests/api.test.js tests/retention.test.js tests/bulk.test.js tests/assessments.test.js tests/assessments-compact.test.js tests/static-imports.test.js tests/bilans-load.test.js tests/transmissions-topaze.test.js",
     "user:create": "node scripts/admin.js create",
     "user:reset": "node scripts/admin.js reset",
     "backup": "node scripts/backup.js",

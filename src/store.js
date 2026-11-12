@@ -8,7 +8,7 @@ export let user=null;
 export async function request(url,method='GET',body){
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);let response;try{response=await fetch(url,{method,signal:controller.signal,credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},...(body===undefined?{}:{body:JSON.stringify(body)})});}catch{throw Error('Serveur inaccessible. Rien n’est confirmé : votre saisie est conservée. Vérifiez la connexion et le PC du cabinet.');}finally{clearTimeout(timeout);}
  let data;try{data=await response.json();}catch{throw Error('Serveur privé indisponible. Ouvrez l’adresse du PC via Tailscale.');}
- if(!response.ok){const e=Error(data.error||'Erreur serveur.');e.status=response.status;throw e;}return data;
+ if(!response.ok){const e=Error(data.error||'Erreur serveur.');e.status=response.status;e.code=data.code;throw e;}return data;
 }
 export function clearIdentity(){user=null;csrf='';}
 export async function identify(){if(demo){user={name:'Démonstration',role:'admin'};return user;}const data=await request('/api/me');user=data.user;csrf=data.csrf;return user;}

@@ -28,7 +28,7 @@ try{
  await kine.locator('#resident-query').fill('arbe');assert.equal(await kine.locator('#resident').inputValue(),'');assert.match(await kine.locator('#resident-search-hint').innerText(),/Aucun résident actif/);await kine.locator('#resident-query').fill('arbo');assert.equal(await kine.locator('#resident option:checked').innerText(),'ARBO. · Maisonnée');await kine.locator('#resident-query').fill('arb');assert.equal(await kine.locator('#resident').inputValue(),'');assert.equal(await kine.locator('#text').inputValue(),'');await kine.getByRole('button',{name:'Premier étage',exact:true}).click();assert.equal(await kine.locator('#resident-query').inputValue(),'');
 
  await kine.locator('#resident').selectOption({label:'ARB.'});await kine.locator('#text').fill('Séance fictive synchronisée entre comptes.');await kine.getByRole('button',{name:'Valider la transmission'}).click();await kine.locator('#toast').filter({hasText:'Transmission enregistrée'}).waitFor();
- await secretary.locator('tbody tr').filter({hasText:'ARB.'}).getByRole('button',{name:'Ouvrir',exact:true}).click({timeout:15000});
+ await secretary.locator('tbody tr').filter({hasText:'ARB.'}).getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/,exact:true}).click({timeout:15000});
  assert.match(await secretary.locator('#final-text').innerText(),/synchronisée entre comptes/);assert.equal(await secretary.locator('#cancel-form').count(),0);
  secretary.on('dialog',d=>d.accept());await secretary.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();
  await kine.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await kine.getByRole('button',{name:'Voir l’historique'}).click();

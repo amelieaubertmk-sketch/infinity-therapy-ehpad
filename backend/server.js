@@ -57,9 +57,29 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(next));db.exec('COMMIT');return json(200,visible(snapshot(db)));
  }catch{if(db.isTransaction)db.exec('ROLLBACK');return json(400,{error:'Opération refusée. Aucune modification.'});}}
 
+
+ // Both operations read and write under the same SQLite write lock.
+ if(['/api/transmissions/create','/api/transmissions/topaze'].includes(route)&&req.method==='POST'){
+ db.exec('BEGIN IMMEDIATE');try{
+ const current=snapshot(db);let next,action,target;
+ if(route.endsWith('/create')){
+ const input=body.transmission;
+ const result=mutation(current.state,{...current.state,transmissions:[input,...current.state.transmissions]},user,{confirmDuplicate:body.confirmDuplicate});
+ next=result.state;action=result.action;target=result.target;
+ }else{
+ const t=current.state.transmissions.find(t=>t.id===body.id);
+ if(!t)throw Error('Transmission introuvable.');
+ if(t.topaze){db.exec('COMMIT');return json(200,visible(current));}
+ const topaze={at:new Date().toISOString(),userId:user.id,userName:user.name};
+ next={...current.state,transmissions:current.state.transmissions.map(row=>row.id===t.id?{...row,topaze}:row)};
+ action='transmission.topaze';target=t.id;
+ }
+ db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(next));audit(db,user.id,action,target);db.exec('COMMIT');return json(200,visible(snapshot(db)));
+ }catch(e){if(db.isTransaction)db.exec('ROLLBACK');return json(e.code==='DUPLICATE_TRANSMISSION'?409:/réservée/.test(e.message)?403:400,{error:e.message,code:e.code});}}
+
  if(route==='/api/state'&&req.method==='GET')return json(200,visible(snapshot(db)));
  if(route==='/api/state'&&req.method==='PUT'){
- db.exec('BEGIN IMMEDIATE');try{const current=snapshot(db);if(body.revision!==current.revision){db.exec('ROLLBACK');return json(409,{error:'Une autre personne a modifié les données. Rechargez les données avant de réessayer ; votre formulaire est conservé.'});}let proposed=body.state;if(user.role==='secretariat'){if(!isDeepStrictEqual(body.state?.residents,visible(current).state.residents)){db.exec('ROLLBACK');return json(403,{error:'Modification des résidents interdite.'});}proposed={...body.state,residents:current.state.residents};}const result=mutation(current.state,proposed,user);db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(result.state));audit(db,user.id,result.action,result.target);db.exec('COMMIT');if(result.action==='transmission.cancelled.delete'||result.action==='transmission.summary.delete'||result.action==='residents.clear'||result.action==='resident.delete'||result.action==='transmission.completedContentDeleted'||result.action==='transmission.purgeTitan'){try{db.exec('PRAGMA wal_checkpoint(TRUNCATE)');}catch{technicalLog('checkpoint.deferred');}}return json(200,visible(snapshot(db)));}catch(e){db.exec('ROLLBACK');return json(/réservée/.test(e.message)?403:400,{error:e.message});}}
+ db.exec('BEGIN IMMEDIATE');try{const current=snapshot(db);if(body.revision!==current.revision){db.exec('ROLLBACK');return json(409,{error:'Une autre personne a modifié les données. Rechargez les données avant de réessayer ; votre formulaire est conservé.'});}let proposed=body.state;if(user.role==='secretariat'){if(!isDeepStrictEqual(body.state?.residents,visible(current).state.residents)){db.exec('ROLLBACK');return json(403,{error:'Modification des résidents interdite.'});}proposed={...body.state,residents:current.state.residents};}const result=mutation(current.state,proposed,user,{confirmDuplicate:body.confirmDuplicate});db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(result.state));audit(db,user.id,result.action,result.target);db.exec('COMMIT');if(result.action==='transmission.cancelled.delete'||result.action==='transmission.summary.delete'||result.action==='residents.clear'||result.action==='resident.delete'||result.action==='transmission.completedContentDeleted'||result.action==='transmission.purgeTitan'){try{db.exec('PRAGMA wal_checkpoint(TRUNCATE)');}catch{technicalLog('checkpoint.deferred');}}return json(200,visible(snapshot(db)));}catch(e){db.exec('ROLLBACK');return json(e.code==='DUPLICATE_TRANSMISSION'?409:/réservée/.test(e.message)?403:400,{error:e.message,code:e.code});}}
  if(route==='/api/users'){
  if(user.role!=='admin')return json(403,{error:'Administration réservée.'});if(req.method==='GET')return json(200,{users:db.prepare('SELECT * FROM users ORDER BY username').all().map(publicUser)});
  if(req.method!=='POST')return json(405,{error:'Méthode interdite.'});

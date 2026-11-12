@@ -7,7 +7,7 @@ const context=await browser.newContext({permissions:['clipboard-read','clipboard
 if(process.env.TEST_STATIC_DEMO)await context.route('https://demo.github.io/**',async route=>{const pathname=new URL(route.request().url()).pathname;const resource=pathname==='/'?'index.html':pathname.slice(1);if(!['index.html','src/app.js','src/store.js','src/demo-store.js','src/domain.js','src/style.css'].includes(resource))return route.abort();await route.fulfill({contentType:resource.endsWith('.html')?'text/html':resource.endsWith('.css')?'text/css':'text/javascript',body:await readFile(new URL('../'+resource,import.meta.url))});});
 const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
 let accept=true;page.on('dialog',d=>accept?d.accept():d.dismiss());
-async function write(action){if(process.env.TEST_LOGIN){const response=page.waitForResponse(r=>r.url().includes('/api/state')&&r.request().method()==='PUT');await action();const r=await response;assert.equal(r.status(),200);await page.waitForTimeout(40);}else await action();}
+async function write(action){if(process.env.TEST_LOGIN){const response=page.waitForResponse(r=>(r.url().includes('/api/state')&&r.request().method()==='PUT'||r.url().endsWith('/api/transmissions/create')&&r.status()===200));await action();const r=await response;assert.equal(r.status(),200);await page.waitForTimeout(40);}else await action();}
 try{
  await page.goto(process.env.BASE_URL||'http://localhost:3000');
  if(process.env.TEST_LOGIN){await page.locator('#username').fill('admin');await page.locator('#password').fill(process.env.TEST_LOGIN);await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.getByRole('button',{name:'Boss',exact:true}).waitFor();}
@@ -27,20 +27,20 @@ try{
  await page.getByLabel('Kinésithérapeute intervenant').selectOption('Alexandre');
  await page.locator('#observation').fill('Observation fictive de test.');
  await write(()=>page.getByRole('button',{name:'Valider la transmission'}).click());
- await write(()=>page.getByRole('button',{name:'Valider la transmission'}).click()); // duplicate confirmed
+ await write(async()=>{await page.getByRole('button',{name:'Valider la transmission'}).click();await page.getByRole('button',{name:'Enregistrer quand même',exact:true}).click();}); // duplicate confirmed
  await page.getByLabel('La séance n’a pas été réalisée').check();
  await page.getByLabel('Motif de non-réalisation').fill('Indisponibilité fictive');
- await write(()=>page.getByRole('button',{name:'Enregistrer la non-réalisation'}).click());
+ await write(async()=>{await page.getByRole('button',{name:'Enregistrer la non-réalisation'}).click();await page.getByRole('button',{name:'Enregistrer quand même',exact:true}).click();});
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
- await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/}).click();
  assert.match(await page.locator('#final-text').innerText(),/Observation complémentaire\nObservation fictive de test/);
  await page.getByRole('button',{name:'Copier la transmission',exact:true}).click();
  assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/Marche fictive personnalisée/);
  assert.equal(await page.locator('#new-status').inputValue(),'À saisir');
  await page.locator('#new-status').selectOption('En cours de saisie');
  await write(()=>page.getByRole('button',{name:'Confirmer le statut'}).click());
- await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/}).click();
  accept=false;await page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click();assert.ok(await page.locator('#mark-done').isVisible());accept=true;
  await write(()=>page.getByRole('button',{name:'Marquer comme saisi sur Titan'}).click());
  assert.equal(await page.locator('tbody tr').count(),2);
@@ -64,7 +64,7 @@ try{
  await page.locator('#resident').selectOption({label:'FIC.'});
  assert.equal(await page.locator('#text').inputValue(),'Nouveau modèle fictif.');
  await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();
- await page.locator('tbody tr').filter({hasText:'À saisir',hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:'Ouvrir'}).click();
+ await page.locator('tbody tr').filter({hasText:'À saisir',hasNotText:'Séance non réalisée'}).first().getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/}).click();
  assert.match(await page.locator('#final-text').innerText(),/Marche fictive personnalisée/);
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();
@@ -93,7 +93,7 @@ try{
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  assert.equal(await page.locator('tbody tr').count(),3);
  const cancelledRow=page.locator('tbody tr').filter({hasText:'Annulée'});
- await cancelledRow.getByRole('button',{name:'Ouvrir'}).click();
+ await cancelledRow.getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/}).click();
  assert.match(await page.locator('#modal').innerText(),/Validation par erreur fictive/);
  assert.equal(await page.locator('#copy').count(),0);
  assert.equal(await page.locator('#new-status').count(),0);
@@ -105,7 +105,7 @@ try{
  await page.getByRole('button',{name:'Voir l’historique'}).click();
  await page.locator('#filter-status').selectOption('Annulée');
  assert.equal(await page.locator('tbody tr').count(),1);
- await page.locator('tbody tr').getByRole('button',{name:'Ouvrir',exact:true}).click();accept=false;await page.locator('#delete-cancelled').click();assert.ok(await page.locator('#delete-cancelled').isVisible());accept=true;await write(()=>page.locator('#delete-cancelled').click());assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique'}).click();await page.locator('#filter-status').selectOption('Annulée');assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);
+ await page.locator('tbody tr').getByRole('button',{name:/^(Ouvrir|Voir le suivi)$/,exact:true}).click();accept=false;await page.locator('#delete-cancelled').click();assert.ok(await page.locator('#delete-cancelled').isVisible());accept=true;await write(()=>page.locator('#delete-cancelled').click());assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique'}).click();await page.locator('#filter-status').selectOption('Annulée');assert.match(await page.locator('tbody').innerText(),/Aucune transmission/);
 
  await page.getByRole('button',{name:'Boss',exact:true}).click();
  await page.getByRole('button',{name:'Actifs',exact:true}).click();

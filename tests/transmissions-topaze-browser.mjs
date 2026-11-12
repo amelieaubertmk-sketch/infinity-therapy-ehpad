@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {once} from 'node:events';
+import {randomBytes} from 'node:crypto';
+import {createApp} from '../backend/server.js';
+import {hashPassword} from '../backend/auth.js';
+import {seed} from '../src/domain.js';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const directory=mkdtempSync(path.join(tmpdir(),'infinity-topaze-ui-')),origin='http://localhost:31011';
+const app=createApp({directory,origin});let browser;
+try{
+ const state=seed();app.db.prepare('UPDATE state SET data=?').run(JSON.stringify(state));
+ const password=randomBytes(24).toString('hex');app.db.prepare('INSERT INTO users VALUES(?,?,?,?,?,1)').run('kine','kine','Kiné fictif','kine',await hashPassword(password));
+ app.server.listen(31011,'127.0.0.1');await once(app.server,'listening');
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(origin);await page.locator('#username').fill('kine');await page.locator('#password').fill(password);await page.getByRole('button',{name:'Se connecter',exact:true}).click();await page.locator('#resident').selectOption(state.residents[0].id);
+ await page.locator('#text').fill('Transmission fictive initiale');await page.getByRole('button',{name:'Valider la transmission'}).click();await page.locator('#toast').filter({hasText:'Transmission enregistrée'}).waitFor();
+ await page.locator('#activity').selectOption('Soins');await page.locator('#text').fill('Nouvelle saisie à préserver');await page.locator('#observation').fill('Observation conservée');
+ await page.getByRole('button',{name:'Valider la transmission'}).click();await page.getByText('Attention, une transmission existe déjà pour ce résident à cette date. Voulez-vous vraiment en enregistrer une nouvelle ?', {exact:true}).waitFor();
+ await page.locator('#duplicate-cancel').click();assert.equal(await page.locator('#text').inputValue(),'Nouvelle saisie à préserver');assert.equal(await page.locator('#observation').inputValue(),'Observation conservée');assert.equal(JSON.parse(app.db.prepare('SELECT data FROM state').get().data).transmissions.length,1);
+ await page.getByRole('button',{name:'Valider la transmission'}).click();await page.locator('#duplicate-confirm').waitFor();await page.keyboard.press('Escape');await page.locator('#modal').waitFor({state:'hidden'});assert.equal(await page.locator('#text').inputValue(),'Nouvelle saisie à préserver');
+ await page.getByRole('button',{name:'Valider la transmission'}).click();await page.locator('#duplicate-confirm').click();await page.locator('#modal').waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#observation').value==='');
+ await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique',exact:true}).click();assert.equal(await page.locator('[data-topaze]').count(),2);assert.equal(await page.getByRole('button',{name:'Voir le suivi',exact:true}).count(),2);
+ const row=page.locator('tbody tr').filter({hasText:'Soins'});await row.getByRole('button',{name:'Pointer sur Topaze',exact:true}).click();await row.getByRole('button',{name:'Pointer sur Topaze',exact:true}).waitFor({state:'detached'});assert.equal(await row.getByRole('button').count(),1);
+ await row.getByRole('button',{name:'Voir le suivi',exact:true}).click();await page.getByText(/Pointé sur Topaze le .* par Kiné fictif/).waitFor();assert.equal(await page.locator('#final-text').innerText(),'Nouvelle saisie à préserver\n\nObservation complémentaire\nObservation conservée');await page.getByRole('button',{name:'Fermer',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique',exact:true}).click();assert.equal(await page.locator('tbody tr').filter({hasText:'Soins'}).getByRole('button').count(),1);assert.equal(await page.locator('[data-topaze]').count(),1);assert.deepEqual(errors,[]);
+ console.log('PASS: duplicate across activities, cancel and Escape retain input, explicit confirmation, Topaze buttons, SQLite user/date, reload persistence, preserved Titan content, no browser errors.');
+}finally{await browser?.close();if(app.server.listening)await new Promise(r=>app.server.close(r));app.close();rmSync(directory,{recursive:true,force:true});}

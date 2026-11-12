@@ -15,14 +15,14 @@ export function createTransmission(db,input){
  const finalText=input.notPerformed?`Séance non réalisée\nMotif : ${reason}`:text+(observation?'\n\nObservation complémentaire\n'+observation:'');
  return {id:crypto.randomUUID(),residentId:resident.id,residentCode:resident.code,sector:resident.sector,date:input.date,activity:input.activity,practitioner:input.practitioner,text:input.notPerformed?'':text,observation:input.notPerformed?'':observation,reason:input.notPerformed?reason:'',notPerformed:!!input.notPerformed,finalText,validatedAt:new Date().toISOString(),status:statuses[0],statusHistory:[]};
 }
-export function potentialDuplicate(db,input){return db.transmissions.some(t=>t.status!=='Annulée'&&t.residentId===input.residentId&&t.date===input.date&&t.activity===input.activity);}
+export function potentialDuplicate(db,input){return db.transmissions.some(t=>t.residentId===input.residentId&&t.date===input.date);}
 export function changeStatus(t,status){if(t.status==='Annulée')throw Error('Une transmission annulée ne peut plus changer de statut.');if(!statuses.includes(status))throw Error('Statut invalide.');return {...t,status,statusHistory:[...t.statusHistory,{from:t.status,to:status,at:new Date().toISOString()}]};}
 
 export function cancelTransmission(t,reason){if(t.status==='Annulée')throw Error('Transmission déjà annulée.');if(!reason?.trim())throw Error('Indiquez un motif d’annulation.');const at=new Date().toISOString();return {...t,status:'Annulée',cancellation:{reason:reason.trim(),at,previousStatus:t.status},statusHistory:[...t.statusHistory,{from:t.status,to:'Annulée',at}]};}
 
 export function deleteResident(db,id){if(!db.residents.some(r=>r.id===id))throw Error('Résident introuvable.');return {...db,residents:db.residents.filter(r=>r.id!==id),transmissions:db.transmissions.filter(t=>t.residentId!==id)};}
 // Only these fields survive completion. Never spread the original payload here.
-export function titanSummary(t){return {id:t.id,residentId:t.residentId,residentCode:t.residentCode,sector:t.sector,date:t.date,activity:t.activity,practitioner:t.practitioner,status:statuses[2],notPerformed:!!t.notPerformed,validatedAt:t.validatedAt,...(t.createdBy?{createdBy:t.createdBy}:{}),...(t.validatedBy?{validatedBy:t.validatedBy}:{}),completedAt:t.completedAt||t.statusHistory?.filter(h=>h.to===statuses[2]).at(-1)?.at||null};}
+export function titanSummary(t){return {id:t.id,residentId:t.residentId,residentCode:t.residentCode,sector:t.sector,date:t.date,activity:t.activity,practitioner:t.practitioner,status:statuses[2],notPerformed:!!t.notPerformed,validatedAt:t.validatedAt,...(t.createdBy?{createdBy:t.createdBy}:{}),...(t.validatedBy?{validatedBy:t.validatedBy}:{}),...(t.topaze?{topaze:t.topaze}:{}),completedAt:t.completedAt||t.statusHistory?.filter(h=>h.to===statuses[2]).at(-1)?.at||null};}
 export function purgeTitan(db){return {...db,transmissions:db.transmissions.map(t=>t.status===statuses[2]?titanSummary(t):t)};}
 
 export function deleteTitanSummary(db,id){const t=db.transmissions.find(t=>t.id===id);if(!t||t.status!==statuses[2])throw Error('Seule une ligne déjà saisie sur Titan peut être supprimée.');return {...db,transmissions:db.transmissions.filter(t=>t.id!==id)};}
