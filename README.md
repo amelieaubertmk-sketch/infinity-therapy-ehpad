@@ -1,5 +1,7 @@
 # Infinity Therapy — Transmissions EHPAD
 
+**Version 2.6.0 — refonte des Bilans résidents** : [installation complète Windows avec sauvegarde](docs/MISE-A-JOUR-2.6.0.md), [guide du formulaire compact, de la corbeille et du suivi Titan](docs/BILANS-RESIDENTS-2.6.0.md), [tests, migrations et fichiers modifiés](docs/VALIDATION-2.6.0.md). Les transmissions restent inchangées. Les PDF de bilans sont désormais exportés sans identifiant résident, après confirmation du dossier dans l’application.
+
 **Version corrigée 2.5.1 — page blanche après mise à jour partielle** : [réparation Windows avec sauvegarde](docs/MISE-A-JOUR-2.5.1.md). Remplacer tous les dossiers de code concernés puis redémarrer le serveur ; conserver la base et `config.json`.
 
 **Version complète 2.5.0** : [installation Windows et sauvegarde](docs/MISE-A-JOUR-2.5.0.md), [guide Bilans résidents](docs/BILANS-RESIDENTS.md), [tests et fichiers livrés](docs/VALIDATION-2.5.0.md). Cette livraison intègre les ajustements ergonomiques et les bilans ; aucune installation intermédiaire 2.4.1 n’est nécessaire.
@@ -123,3 +125,9 @@ Les tests navigateur du module sont dans `tests/assessments-browser.mjs` ; les t
 ## Version 2.5.1 — démarrage après mise à jour partielle
 
 Les imports principaux sont contrôlés ; un échec affiche une aide au lieu d’un écran vide. Les bilans sont chargés à l’ouverture de leur onglet : un module absent ne bloque plus les transmissions. Tous les imports du navigateur utilisent la même référence de version pour éviter les anciens modules en cache. Aucun changement de données, d’autorisations ou de configuration Windows/Tailscale. Test de régression : `PLAYWRIGHT_MODULE=/chemin/vers/playwright/index.mjs node tests/startup-browser.mjs`.
+
+## Bilans résidents 2.6.0
+
+Formulaire conditionnel compact, MRC 0/NE distincts, aides partagées entre marche/TUG/Tinetti, Tinetti guidé et partiel, transferts simples, génération locale des deux textes et validation professionnelle. Suppression récupérable des brouillons autorisés, suivi manuel des bilans à intégrer dans Titan, PDF A4 sans identifiant patient et conservation des documents/versions dans SQLite. Aucun service externe ni changement Tailscale ou de démarrage Windows.
+
+Les anciens bilans ne sont pas convertis ; les trois tables ajoutées conservent le suivi, les versions et les PDF. L’absence d’identifiant dans un PDF ne garantit pas une anonymisation complète du texte clinique. Lire le guide avant mise à jour et effectuer une sauvegarde complète.
