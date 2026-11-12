@@ -1,5 +1,7 @@
 # Correction ciblée du chargement des Bilans — 2.6.1
 
+**Si le 404 persiste après copie manuelle, utiliser désormais la [réparation de l’installation configurée](REPARATION-INSTALLATION-BILANS-2.6.1.md)**, qui cible le bon projet et vérifie les réponses après redémarrage.
+
 ## Cause établie et limite du diagnostic à distance
 
 La console fournie montre HTTP 404 sur `/src/assessments-compact.js`. Ce module est une dépendance obligatoire de `assessments.js` : son import échoue et le panneau ne peut pas démarrer. La capture de l’Explorateur montre le fichier sur disque, mais ne prouve pas que ce dossier est celui utilisé par le processus Node actif.
