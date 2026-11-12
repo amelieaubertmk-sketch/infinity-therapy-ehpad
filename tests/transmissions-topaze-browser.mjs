@@ -9,7 +9,7 @@ import {hashPassword} from '../backend/auth.js';
 import {seed} from '../src/domain.js';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
 const directory=mkdtempSync(path.join(tmpdir(),'infinity-topaze-ui-')),origin='http://localhost:31011';
-const app=createApp({directory,origin});let browser;
+let app=createApp({directory,origin});let browser;
 try{
  const state=seed();app.db.prepare('UPDATE state SET data=?').run(JSON.stringify(state));
  const password=randomBytes(24).toString('hex');app.db.prepare('INSERT INTO users VALUES(?,?,?,?,?,1)').run('kine','kine','Kiné fictif','kine',await hashPassword(password));
@@ -26,5 +26,32 @@ try{
  const row=page.locator('tbody tr').filter({hasText:'Soins'});await row.getByRole('button',{name:'Pointer sur Topaze',exact:true}).click();await row.getByRole('button',{name:'Pointer sur Topaze',exact:true}).waitFor({state:'detached'});assert.equal(await row.getByRole('button').count(),1);
  await row.getByRole('button',{name:'Voir le suivi',exact:true}).click();await page.getByText(/Pointé sur Topaze le .* par Kiné fictif/).waitFor();assert.equal(await page.locator('#final-text').innerText(),'Nouvelle saisie à préserver\n\nObservation complémentaire\nObservation conservée');await page.getByRole('button',{name:'Fermer',exact:true}).click();
  await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique',exact:true}).click();assert.equal(await page.locator('tbody tr').filter({hasText:'Soins'}).getByRole('button').count(),1);assert.equal(await page.locator('[data-topaze]').count(),1);assert.deepEqual(errors,[]);
+
+ // Existing Titan summary: only its displayed badge changes after pointage.
+ const titanRow=page.locator('tbody tr').filter({hasText:'Marche'});
+ await titanRow.getByRole('button',{name:'Voir le suivi',exact:true}).click();
+ page.once('dialog',d=>d.accept());await page.locator('#mark-done').click();
+ await titanRow.locator('.badge.done').waitFor();assert.equal(await titanRow.locator('.badge').innerText(),'Saisi sur Titan');
+ const titanColor=await titanRow.locator('.badge').evaluate(el=>getComputedStyle(el).backgroundColor);
+ assert.equal(await titanRow.locator('[data-topaze]').count(),1);
+ await titanRow.locator('[data-topaze]').click();await titanRow.locator('.badge.topaze').waitFor();
+ assert.equal(await titanRow.locator('.badge').innerText(),'Pointé sur Topaze');
+ assert.equal(await titanRow.getByRole('button').count(),1);
+ assert.equal(await titanRow.locator('.badge').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(20, 83, 45)');
+ assert.notEqual(titanColor,'rgb(20, 83, 45)');
+ const stored=JSON.parse(app.db.prepare('SELECT data FROM state').get().data).transmissions.find(t=>t.activity==='Marche');
+ assert.equal(stored.status,'Saisi sur Titan');assert.ok(stored.topaze.at);
+ await titanRow.getByRole('button',{name:'Voir le suivi',exact:true}).click();
+ assert.equal(await page.locator('#modal .badge').innerText(),'Pointé sur Topaze');await page.getByRole('button',{name:'Fermer',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique',exact:true}).click();
+ assert.equal(await titanRow.locator('.badge').innerText(),'Pointé sur Topaze');
+ await page.getByRole('button',{name:'Se déconnecter',exact:true}).click();
+ await new Promise(r=>app.server.close(r));app.close();app=createApp({directory,origin});app.server.listen(31011,'127.0.0.1');await once(app.server,'listening');
+ await page.reload();await page.locator('#username').fill('kine');await page.locator('#password').fill(password);await page.getByRole('button',{name:'Se connecter',exact:true}).click();
+ await page.getByRole('button',{name:'Transmissions à saisir dans Titan'}).click();await page.getByRole('button',{name:'Voir l’historique',exact:true}).click();
+ assert.equal(await titanRow.locator('.badge').innerText(),'Pointé sur Topaze');assert.equal(await titanRow.getByRole('button').count(),1);
+ assert.deepEqual(JSON.parse(app.db.prepare('SELECT data FROM state').get().data).transmissions.find(t=>t.id===stored.id),stored);
+ assert.deepEqual(errors,[]);
+ console.log('PASS: Titan badge before pointage, dark green Topaze badge afterwards, unchanged stored status, detail, refresh, logout/login and server restart.');
  console.log('PASS: duplicate across activities, cancel and Escape retain input, explicit confirmation, Topaze buttons, SQLite user/date, reload persistence, preserved Titan content, no browser errors.');
 }finally{await browser?.close();if(app.server.listening)await new Promise(r=>app.server.close(r));app.close();rmSync(directory,{recursive:true,force:true});}

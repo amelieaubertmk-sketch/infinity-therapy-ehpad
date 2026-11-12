@@ -15,7 +15,7 @@
       "base260": "46f00fe3daf650612e4434aeb01dbf4674efd66e0beb299f5c0939c9a14b7055"
     },
     "src/app.js": {
-      "sha256": "cc0da8b4d5c5b54848ba834ae0548dbe07ab0f55388ecb586b19797d17e3e235",
+      "sha256": "3aca51bcb0a1acf4ef80ba402d28880e85f718ffc32e181c54583fa13bec5461",
       "base260": "2985871b64511c996b61c0de3f0aebcd568f036b9d726a3c7dafb4a5aa7e262d"
     },
     "src/domain.js": {
@@ -87,7 +87,7 @@
       "base260": "a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890"
     },
     "src/style.css": {
-      "sha256": "13204592eb18113c16e494539e574d6ff565fb6c0f2fd239f2b41f08cb193e5f",
+      "sha256": "2e47484df9d16eabb0c1249f286b46fb2e467d279dfd7256019501966249ea04",
       "base260": "23f4a8f7b596e59e02a1106e65b19e5ad6a2b3fc5eb58418207dba809e2267b1"
     }
   }

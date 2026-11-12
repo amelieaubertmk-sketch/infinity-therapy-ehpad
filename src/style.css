@@ -17,3 +17,6 @@
 
 #assessments-panel>.table-wrap{max-height:360px;overflow:auto}
 #assessments-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:12px;background:#fff5f2;border:1px solid #efd7d0;border-radius:8px}
+
+/* Transmission pointage: visually distinct from the light Titan badge. */
+.badge.topaze{background:#14532d;color:#fff}
