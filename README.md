@@ -1,5 +1,7 @@
 # Infinity Therapy — Transmissions EHPAD
 
+**Correctif ciblé 2.6.1 — chargement des Bilans** : [diagnostic, fichiers et remplacement Windows sans réinitialisation](docs/CORRECTION-BILANS-2.6.1.md), [rapport de tests](docs/VALIDATION-2.6.1.md). Le formulaire et les données 2.6.0 restent conservés.
+
 **Version 2.6.0 — refonte des Bilans résidents** : [installation complète Windows avec sauvegarde](docs/MISE-A-JOUR-2.6.0.md), [guide du formulaire compact, de la corbeille et du suivi Titan](docs/BILANS-RESIDENTS-2.6.0.md), [tests, migrations et fichiers modifiés](docs/VALIDATION-2.6.0.md). Les transmissions restent inchangées. Les PDF de bilans sont désormais exportés sans identifiant résident, après confirmation du dossier dans l’application.
 
 **Version corrigée 2.5.1 — page blanche après mise à jour partielle** : [réparation Windows avec sauvegarde](docs/MISE-A-JOUR-2.5.1.md). Remplacer tous les dossiers de code concernés puis redémarrer le serveur ; conserver la base et `config.json`.

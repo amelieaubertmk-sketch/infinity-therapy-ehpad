@@ -1,0 +1,94 @@
+{
+  "release": "2.6.1",
+  "base": "2.6.0",
+  "files": {
+    "server.js": {
+      "sha256": "49f6fbbf234a6fef13ef3174e4c2b7531c2aa8953d0ea8c8fc37beebb2fae3e2",
+      "base260": "49f6fbbf234a6fef13ef3174e4c2b7531c2aa8953d0ea8c8fc37beebb2fae3e2"
+    },
+    "index.html": {
+      "sha256": "7b339badbf550a25698919849f6b24b12993e4f0b5aa6a136e039896315c1b2e",
+      "base260": "23d7ed25ed84ad80e5de1587767174304402e3660ce53e3073cdf15911750b50"
+    },
+    "package.json": {
+      "sha256": "eee46a10632913cbc0f1af988f4661d3fba44d16996b1468499181f46922dcaf",
+      "base260": "46f00fe3daf650612e4434aeb01dbf4674efd66e0beb299f5c0939c9a14b7055"
+    },
+    "src/app.js": {
+      "sha256": "81943fa6747b21f808d6730210b4b7a2e4e4544998005a05d86582d3ce5b9bf5",
+      "base260": "2985871b64511c996b61c0de3f0aebcd568f036b9d726a3c7dafb4a5aa7e262d"
+    },
+    "src/domain.js": {
+      "sha256": "0783da33af08154aa04bb2a8774d667a8c18de37ab65d9b8eaa4dfb1f55c2f21",
+      "base260": "0783da33af08154aa04bb2a8774d667a8c18de37ab65d9b8eaa4dfb1f55c2f21"
+    },
+    "src/store.js": {
+      "sha256": "a9c57d5434ff593c1ce6d76ec0ef64ffcb15210566d7e5e1051a1fa4fbb0d7f5",
+      "base260": "a9c57d5434ff593c1ce6d76ec0ef64ffcb15210566d7e5e1051a1fa4fbb0d7f5"
+    },
+    "src/demo-store.js": {
+      "sha256": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f",
+      "base260": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f"
+    },
+    "src/assessments.js": {
+      "sha256": "8e089d1fc76407f48a99691220fcd98d959803e256542a2904a8c49e003a81e0",
+      "base260": "0e60b9f175986a320763c03702d24ad990f572088ff60fe93a2ccc385228c672"
+    },
+    "src/assessments-domain.js": {
+      "sha256": "8f0869d105c857ba4fa7002b287c3d0bbeb42ba921e695d662a7cbcd55966ea8",
+      "base260": "8c31dce20abc5dce2893d89c51127dd6a43ef168895e30810bc51205d9246712"
+    },
+    "src/assessments-compact.js": {
+      "sha256": "2264f6ca047e763540e7d603e846340df9907e638ad0bcb77a81d9f8c8031177",
+      "base260": "2264f6ca047e763540e7d603e846340df9907e638ad0bcb77a81d9f8c8031177"
+    },
+    "backend/server.js": {
+      "sha256": "dcedbcc4ca9071471b24aa07c6322f2af5fc2c0e9b8b13cfac8694e5486a4018",
+      "base260": "c46c58842045c876a62fb7fceff6ecc692fb66f0cf36c8627cadc5e4bcb645a4"
+    },
+    "backend/assessments.js": {
+      "sha256": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163",
+      "base260": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163"
+    },
+    "backend/assessment-pdf.js": {
+      "sha256": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f",
+      "base260": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f"
+    },
+    "backend/pdf-font.js": {
+      "sha256": "cd5a8295c6997116c29f181db58c1e2f162829f140162bad646cb9bc3daa4889",
+      "base260": "cd5a8295c6997116c29f181db58c1e2f162829f140162bad646cb9bc3daa4889"
+    },
+    "backend/database.js": {
+      "sha256": "4bbd14f0dad324529bce587f51dc71fa0d66378ba9d715162b69848043a8ae59",
+      "base260": "4bbd14f0dad324529bce587f51dc71fa0d66378ba9d715162b69848043a8ae59"
+    },
+    "backend/auth.js": {
+      "sha256": "da7f65155a70e9b1baadce053291602b2ca7d3451ecbf9c092ac898c3c5c2da3",
+      "base260": "da7f65155a70e9b1baadce053291602b2ca7d3451ecbf9c092ac898c3c5c2da3"
+    },
+    "backend/mutations.js": {
+      "sha256": "0ac2029f7b8fd4e669408e2998a1fb9319027c9b0ba27e9b48f5edb228c6c826",
+      "base260": "0ac2029f7b8fd4e669408e2998a1fb9319027c9b0ba27e9b48f5edb228c6c826"
+    },
+    "backend/xlsx.js": {
+      "sha256": "97258a13e889f853a7904c1f30d2190df4a88e38a0d43bde61e4803045c725c4",
+      "base260": "97258a13e889f853a7904c1f30d2190df4a88e38a0d43bde61e4803045c725c4"
+    },
+    "backend/log.js": {
+      "sha256": "be37a7c460813af9b211ad75c3b3e85c4e3b89cf0adb9416e03c0cd2764057c4",
+      "base260": "be37a7c460813af9b211ad75c3b3e85c4e3b89cf0adb9416e03c0cd2764057c4"
+    },
+    "assets/fonts/DejaVuSans.ttf": {
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "base260": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e"
+    },
+    "assets/fonts/DejaVuSans-Bold.ttf": {
+      "sha256": "a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890",
+      "base260": "a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890"
+    },
+    "src/style.css": {
+      "sha256": "13204592eb18113c16e494539e574d6ff565fb6c0f2fd239f2b41f08cb193e5f",
+      "base260": "23f4a8f7b596e59e02a1106e65b19e5ad6a2b3fc5eb58418207dba809e2267b1"
+    }
+  }
+}

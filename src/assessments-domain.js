@@ -1,4 +1,4 @@
-import {validateCompact,compactDiagnosis,compactProject,compactMeasurements} from './assessments-compact.js?v=2.6.0';
+import {validateCompact,compactDiagnosis,compactProject,compactMeasurements} from './assessments-compact.js?v=2.6.1';
 // Local deterministic templates. No network calls and no medical diagnosis from scores.
 export const examStates=['Non réalisé','Non réalisable','Contre-indiqué','Réalisé'];
 export const anamnesisFields=[['reason','Motif de prise en charge'],['medical','Diagnostics médicaux connus et antécédents pertinents'],['falls','Historique des chutes'],['painLocation','Douleur : localisation'],['painIntensity','Douleur : intensité et échelle utilisée'],['painCircumstances','Douleur : circonstances et retentissement'],['previousFunction','Situation fonctionnelle antérieure'],['precautions','Précautions et contre-indications'],['notes','Observations complémentaires']];

@@ -16,3 +16,4 @@
 #assessments-panel>.tabs{flex-wrap:wrap;gap:6px;overflow:visible}#assessments-panel>.tabs button{flex:1 1 150px;white-space:normal;font-size:12px}body:has(#assessments-panel) header{height:auto;min-height:94px;padding-top:8px;padding-bottom:8px}
 
 #assessments-panel>.table-wrap{max-height:360px;overflow:auto}
+#assessments-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:12px;background:#fff5f2;border:1px solid #efd7d0;border-radius:8px}
