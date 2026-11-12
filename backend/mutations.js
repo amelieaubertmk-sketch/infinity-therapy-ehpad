@@ -1,7 +1,7 @@
 import {isDeepStrictEqual as equal} from 'node:util';
-import {activities,sectors,createTransmission,changeStatus,cancelTransmission,deleteResident,purgeTitan,deleteTitanSummary,deleteCancelledTransmission,potentialDuplicate} from '../src/domain.js';
+import {activities,sectors,createTransmission,changeStatus,cancelTransmission,deleteResident,purgeTitan,deleteTitanSummary,deleteCancelledTransmission,potentialDuplicate,validatePrescription} from '../src/domain.js';
 const fail=m=>{throw Error(m);};
-function residentValid(r){if(typeof r.id!=='string'||!r.id||typeof r.code!=='string'||!r.code.trim()||r.code.length>30||!sectors.includes(r.sector)||typeof r.archived!=='boolean'||!r.templates||Object.keys(r.templates).length!==4||activities.some(a=>typeof r.templates[a]!=='string'||r.templates[a].length>20000))fail('Résident ou modèles invalides.');return {id:r.id,code:r.code.trim(),sector:r.sector,archived:r.archived,templates:r.templates};}
+function residentValid(r){if(typeof r.id!=='string'||!r.id||typeof r.code!=='string'||!r.code.trim()||r.code.length>30||!sectors.includes(r.sector)||typeof r.archived!=='boolean'||!r.templates||Object.keys(r.templates).length!==4||activities.some(a=>typeof r.templates[a]!=='string'||r.templates[a].length>20000))fail('Résident ou modèles invalides.');return {id:r.id,code:r.code.trim(),sector:r.sector,archived:r.archived,templates:r.templates,...(r.prescription!==undefined?{prescription:validatePrescription(r.prescription)}:{})};}
 // Apply one explicit change to a server-owned snapshot; never trust client historical fields.
 export function mutation(current,proposed,user,{confirmDuplicate=false}={}){
  if(!proposed||proposed.version!==1||!Array.isArray(proposed.residents)||!Array.isArray(proposed.transmissions))fail('Données invalides.');

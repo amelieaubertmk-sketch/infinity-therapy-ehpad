@@ -35,3 +35,21 @@ export function sessionAge(date,now=today()){
  const days=Math.round((Date.parse(now)-Date.parse(date))/86400000);
  return days===0?{color:'today',label:"Aujourd’hui"}:days===1?{color:'yesterday',label:'Hier'}:days>1?{color:'older',label:'Antérieure'}:{color:'future',label:'À venir'};
 }
+
+// Administrative prescription follow-up only; never a legal validity decision.
+export function validatePrescription(value){
+ if(!value||!['unknown','missing','dated'].includes(value.status))throw Error('Statut d’ordonnance invalide.');
+ if(value.status!=='dated'){if(value.date!==undefined&&value.date!=='')throw Error('Une ordonnance sans date disponible ne peut pas conserver une date.');return {status:value.status};}
+ if(typeof value.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value.date)||!Number.isFinite(Date.parse(value.date))||new Date(value.date).toISOString().slice(0,10)!==value.date)throw Error('Date d’ordonnance invalide.');
+ return {status:'dated',date:value.date};
+}
+export function prescriptionFollowUp(resident,now=today()){
+ const p=resident?.prescription;
+ if(!p||p.status==='unknown')return {status:'unknown'};
+ if(p.status==='missing')return {status:'missing'};
+ const [year,month,day]=p.date.split('-').map(Number);
+ const lastDay=new Date(Date.UTC(year+1,month,0)).getUTCDate();
+ const due=`${year+1}-${String(month).padStart(2,'0')}-${String(Math.min(day,lastDay)).padStart(2,'0')}`;
+ const days=Math.round((Date.parse(due)-Date.parse(now))/86400000);
+ return {status:'dated',date:p.date,due,reminder:days<0?'overdue':days<=30?'soon':'normal'};
+}

@@ -69,6 +69,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  }else{
  const t=current.state.transmissions.find(t=>t.id===body.id);
  if(!t)throw Error('Transmission introuvable.');
+ if(current.state.residents.find(r=>r.id===t.residentId)?.prescription?.status==='missing')throw Error('Ordonnance manquante : pointage Topaze indisponible.');
  if(t.topaze){db.exec('COMMIT');return json(200,visible(current));}
  const topaze={at:new Date().toISOString(),userId:user.id,userName:user.name};
  next={...current.state,transmissions:current.state.transmissions.map(row=>row.id===t.id?{...row,topaze}:row)};
