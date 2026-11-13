@@ -1,10 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {mkdtempSync,rmSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {once} from 'node:events';
 import {createApp} from '../backend/server.js';
+import {DatabaseSync} from 'node:sqlite';
 import {newSession} from '../backend/auth.js';
 import {seed,createTransmission,validatePrescription,prescriptionFollowUp} from '../src/domain.js';
 
@@ -40,6 +41,25 @@ test('resident prescription persists, protects Topaze against stale clients and 
  await stop();app=createApp({directory});await start();assert.equal((await req('/api/state')).data.state.residents[0].prescription.status,'missing');
  result=await set({status:'dated',date:'2020-01-01'});assert.equal(result.status,200);assert.deepEqual(result.data.state.transmissions,state.transmissions);
  assert.equal((await req('/api/transmissions/topaze',{id:state.transmissions[0].id},'secretariat')).status,200); // Age alone never blocks pointage.
+
+ let pointed=(await req('/api/state')).data.state.transmissions[0];assert.ok(pointed.topaze);
+ result=await set({status:'missing'});assert.equal(result.status,200);
+ let cancelled=result.data.state.transmissions[0];assert.ok(!cancelled.topaze);assert.deepEqual(cancelled.topazeHistory[0].pointage,pointed.topaze);assert.equal(cancelled.topazeHistory[0].cancelledBy,'admin');assert.equal(cancelled.finalText,pointed.finalText);assert.equal(cancelled.status,pointed.status);
+ const refused=await req('/api/transmissions/topaze',{id:cancelled.id},'secretariat');assert.equal(refused.data.error,'Pointage impossible : ordonnance manquante');
+ result=await set({status:'dated',date:'2026-11-13'});assert.ok(!result.data.state.transmissions[0].topaze);
+ await stop();app=createApp({directory});await start();assert.ok(!(await req('/api/state')).data.state.transmissions[0].topaze);
+ assert.equal((await req('/api/transmissions/topaze',{id:cancelled.id},'secretariat')).status,200);
+ pointed=(await req('/api/state')).data.state.transmissions[0];assert.ok(pointed.topaze);assert.equal(pointed.topazeHistory.length,1);
+ // Competing requests: whichever acquires the write lock first, missing wins.
+ const race=await Promise.all([set({status:'missing'}),req('/api/transmissions/topaze',{id:cancelled.id},'secretariat')]);assert.equal(race[0].status,200);
+ assert.ok(!(await req('/api/state')).data.state.transmissions[0].topaze);
+ // Simulate a pre-correction database with an active pointage and missing prescription.
+ const old=(await req('/api/state')).data.state;old.transmissions[0]={...old.transmissions[0],topaze:pointed.topaze};app.db.prepare('UPDATE state SET data=?').run(JSON.stringify(old));
+ await stop();app=createApp({directory});await start();
+ const repaired=(await req('/api/state')).data.state.transmissions[0];assert.ok(!repaired.topaze);assert.equal(repaired.topazeHistory.length,3);assert.equal(repaired.finalText,pointed.finalText);
+ const backups=readdirSync(directory).filter(f=>f.startsWith('before-topaze-correction-'));assert.equal(backups.length,1);
+ const saved=new DatabaseSync(path.join(directory,backups[0]),{readOnly:true});assert.equal(saved.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.deepEqual(JSON.parse(saved.prepare('SELECT data FROM state').get().data).transmissions[0].topaze,pointed.topaze);saved.close();
+ await stop();app=createApp({directory});await start();assert.equal(readdirSync(directory).filter(f=>f.startsWith('before-topaze-correction-')).length,1);assert.equal((await req('/api/state')).data.state.transmissions[0].topazeHistory.length,3);
  result=await set({status:'unknown'});assert.equal(result.status,200);assert.deepEqual(result.data.state.residents[0].prescription,{status:'unknown'});
  }finally{await stop();rmSync(directory,{recursive:true,force:true});}
 });

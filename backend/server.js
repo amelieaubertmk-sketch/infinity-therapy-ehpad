@@ -1,3 +1,4 @@
+import {reconcileLegacyTopaze,invalidateMissingPointages} from './topaze.js';
 import http from 'node:http';
 import {initializeAssessments,assessmentRoute} from './assessments.js';
 import {exportWorkbook} from './xlsx.js';
@@ -13,7 +14,7 @@ import {mutation} from './mutations.js';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const security={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"};
 export function createApp({directory,origin='http://localhost:3000'}={}){
- const allowed=new URL(origin);if(allowed.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(allowed.hostname))throw Error('HTTPS requis hors localhost.');const db=database(directory);initializeAssessments(db);let closed=false,activeLogins=0;
+ const allowed=new URL(origin);if(allowed.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(allowed.hostname))throw Error('HTTPS requis hors localhost.');const db=database(directory);try{reconcileLegacyTopaze(db);}catch(e){db.close();throw e;}initializeAssessments(db);let closed=false,activeLogins=0;
  const cookie=(token,expire=false)=>`infinity_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${expire?0:28800}${allowed.protocol==='https:'?'; Secure':''}`;
  const server=http.createServer(async(req,res)=>{
  const json=(code,data,headers={})=>{res.writeHead(code,{...security,'Content-Type':'application/json; charset=utf-8',...headers});res.end(JSON.stringify(data));};
@@ -54,7 +55,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  if(exporting){const file=exportWorkbook(rows);audit(db,user.id,'transmission.export',JSON.stringify(body.ids));db.exec('COMMIT');return json(200,{file:file.toString('base64')});}
  const at=new Date().toISOString();for(const t of rows){if(restoring)db.prepare('DELETE FROM trash WHERE id=?').run(t.id);else db.prepare('INSERT INTO trash VALUES(?,?,?,?)').run(t.id,at,user.id,JSON.stringify(t));audit(db,user.id,restoring?'transmission.restore':'transmission.trash',t.id);}
  const next={...current.state,transmissions:restoring?[...current.state.transmissions,...rows]:current.state.transmissions.filter(t=>!body.ids.includes(t.id))};
- db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(next));db.exec('COMMIT');return json(200,visible(snapshot(db)));
+ db.prepare('UPDATE state SET revision=revision+1,data=? WHERE id=1').run(JSON.stringify(invalidateMissingPointages(next,user)));db.exec('COMMIT');return json(200,visible(snapshot(db)));
  }catch{if(db.isTransaction)db.exec('ROLLBACK');return json(400,{error:'Opération refusée. Aucune modification.'});}}
 
 
@@ -69,7 +70,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  }else{
  const t=current.state.transmissions.find(t=>t.id===body.id);
  if(!t)throw Error('Transmission introuvable.');
- if(current.state.residents.find(r=>r.id===t.residentId)?.prescription?.status==='missing')throw Error('Ordonnance manquante : pointage Topaze indisponible.');
+ if(current.state.residents.find(r=>r.id===t.residentId)?.prescription?.status==='missing')throw Error('Pointage impossible : ordonnance manquante');
  if(t.topaze){db.exec('COMMIT');return json(200,visible(current));}
  const topaze={at:new Date().toISOString(),userId:user.id,userName:user.name};
  next={...current.state,transmissions:current.state.transmissions.map(row=>row.id===t.id?{...row,topaze}:row)};
