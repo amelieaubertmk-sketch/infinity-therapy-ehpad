@@ -1,5 +1,5 @@
 import {walkingFields,anamnesisFields,testDefinitions,testResult,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,pomaItems,findingOptions,effectiveAids,effectiveTug,compactTinetti,timedInterpretation,testDescriptions,reviewLabel,recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance} from '../src/assessments-compact.js';
+import {muscleRows,pomaItems,findingOptions,effectiveAids,effectiveTug,compactTinetti,timedInterpretation,testDescriptions,reviewLabel,recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 function wrap(text,width,size=10,bold=false){const lines=[];for(const raw of String(text??'').split('\n')){let line='';for(let word of raw.split(/\s+/)){if(line&&measuredWidth(line+' '+word,size,bold)>width){lines.push(line);line='';}while(measuredWidth(word,size,bold)>width){let cut=1;while(cut<word.length&&measuredWidth(word.slice(0,cut+1),size,bold)<=width)cut++;lines.push(word.slice(0,cut));word=word.slice(cut);}line+=(line?' ':'')+word;}lines.push(line);}return lines;}
 
@@ -39,7 +39,47 @@ export function assessmentPDF(record,previous){
    if(tug.protocol)paragraph('Protocole : '+tug.protocol);
   }
  }
- for(const [key,title] of [['tug','2.3 — Timed Up and Go (TUG)'],['tinetti','2.4 — Tinetti POMA 28'],['chair','2.5 — Five Times Sit-to-Stand (5xSTS)']]){const t=key==='tug'?effectiveTug(c):c[key];if(!t.status)continue;paragraph(title,true);paragraph(testDescriptions[key]);if(key==='tug'){tugBody(c,t);continue;}if(t.status==='Non réalisable'){paragraph('Non réalisable — '+t.reason);continue;}if(key==='tinetti'){const scores=compactTinetti(c);if(scores.balance!==null)row('Équilibre',scores.balance+'/16');if(scores.gait!==null)row('Marche',scores.gait+'/12');if(scores.total!==null)row('Total',scores.total+'/28');paragraph(scores.interpretation);paragraph('Référence : POMA 28, Tinetti (1986) ; repères conventionnels de dépistage à contextualiser.');if(scores.partial)paragraph('Les observations évaluables sont conservées dans l’application ; aucun total complet n’est attribué.');}else paragraph(timedInterpretation(c,key));if(key==='chair'&&t.arms)paragraph('Utilisation des bras : '+t.arms);if(key!=='chair')paragraph('Aides utilisées : '+(effectiveAids(c,t).join(', ')||'aucune renseignée'));if(t.conditions.trim())paragraph('Conditions : '+t.conditions);if(t.protocol)paragraph('Protocole : '+t.protocol);}
+ function chairBody(c,chair){
+  const status=chairStatus(chair);
+  if(chair.humanAssistance===undefined){
+   if(status==='Impossible'){paragraph('Non réalisable — '+chair.reason);return;}
+   if(status==='Réalisé'){
+    paragraph(timedInterpretation(c,'chair'));
+    if(chair.arms)paragraph('Utilisation des bras : '+chair.arms);
+    if(chair.conditions.trim())paragraph('Conditions : '+chair.conditions);
+    if(chair.protocol)paragraph('Protocole : '+chair.protocol);
+   }else paragraph(status);
+   return;
+  }
+  if(status==='Réalisé'){
+   if(chair.time)paragraph('Temps : '+chair.time+' secondes');
+   const armsLabel=chairArms.find(([value])=>value===chair.arms)?.[1];
+   if(armsLabel)paragraph('Utilisation des bras : '+armsLabel);
+   if(chair.humanAssistance)paragraph('Assistance humaine : '+chair.humanAssistance);
+  }else if(status==='Non réalisé')paragraph(status);
+  for(const message of chairResult(chair).messages)paragraph(message);
+  if(chair.reason&&status==='Impossible')paragraph('Motif : '+chair.reason);
+  if(chair.notes.trim())paragraph('Observations complémentaires : '+chair.notes.trim());
+ }
+ for(const [key,title] of [['tug','2.3 — Timed Up and Go (TUG)'],['tinetti','2.4 — Tinetti POMA 28'],['chair','2.5 — Five Times Sit-to-Stand (5xSTS)']]){
+  const t=key==='tug'?effectiveTug(c):c[key];
+  if(!t.status)continue;
+  paragraph(title,true);
+  paragraph(testDescriptions[key]);
+  if(key==='tug'){tugBody(c,t);continue;}
+  if(key==='chair'){chairBody(c,t);continue;}
+  if(t.status==='Non réalisable'){paragraph('Non réalisable — '+t.reason);continue;}
+  const scores=compactTinetti(c);
+  if(scores.balance!==null)row('Équilibre',scores.balance+'/16');
+  if(scores.gait!==null)row('Marche',scores.gait+'/12');
+  if(scores.total!==null)row('Total',scores.total+'/28');
+  paragraph(scores.interpretation);
+  paragraph('Référence : POMA 28, Tinetti (1986) ; repères conventionnels de dépistage à contextualiser.');
+  if(scores.partial)paragraph('Les observations évaluables sont conservées dans l’application ; aucun total complet n’est attribué.');
+  paragraph('Aides utilisées : '+(effectiveAids(c,t).join(', ')||'aucune renseignée'));
+  if(t.conditions.trim())paragraph('Conditions : '+t.conditions);
+  if(t.protocol)paragraph('Protocole : '+t.protocol);
+ }
  if(c.jointsEnabled&&c.joints.trim()){paragraph('2.6 — Bilan articulaire',true);paragraph(c.joints);}const transfers=Object.entries(c.transfers).filter(([,v])=>v);if(transfers.length){paragraph('2.7 — Transferts',true);for(const [key,value] of transfers)row(key==='bedChair'?'Lit-fauteuil':'Assis-debout',value);}if(c.findings.length){paragraph('2.8 — Constats retenus par l’évaluateur',true);for(const [id,label] of findingOptions)if(c.findings.includes(id))paragraph(label);}}
  page();paragraph(`Document finalisé — validation : ${stamp(record.finalizedAt)} — ${record.finalizedBy}`);if(record.clinical.schema===2){compactBody();}else{section('01 — Anamnèse et contexte clinique');for(const [id,label] of anamnesisFields)if(record.clinical.anamnesis[id].trim())paragraph(label+' : '+record.clinical.anamnesis[id]);section('2. Examen clinique et fonctionnel');for(const [id,label] of walkingFields)if(record.clinical.walking[id].trim())paragraph(label+' : '+record.clinical.walking[id]);const omitted=new Map();for(const def of testDefinitions){const t=record.clinical.tests[def.id];if(t.status!=='Réalisé'){const key=testResult(def,t)+(t.conditions?' | Conditions : '+t.conditions:'');omitted.set(key,[...(omitted.get(key)||[]),def.label]);continue;}const result=testResult(def,t)+(t.conditions?' | Conditions : '+t.conditions:'');if(result.length<1500)row(def.label,result);else{paragraph(def.label,true);paragraph(result);}if(def.id==='tinetti')for(const [id,label,max] of [...balanceItems,...gaitItems])row(label,`${t.items[id]}/${max}`);}for(const [reason,labels] of omitted){paragraph(reason,true);paragraph(labels.join(' ; '));}
 }

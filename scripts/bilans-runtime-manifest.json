@@ -31,7 +31,7 @@
       "base260": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f"
     },
     "src/assessments.js": {
-      "sha256": "d205d3ff7617fd5e6b7ed9a2e72ae6c87184bfb1e838c00c69324faa0200ffe0",
+      "sha256": "ca7e2a7d2c0891aab90835359c4621de6a14d6d95cb4f1809b5bd4ec2acaa88f",
       "base260": "0e60b9f175986a320763c03702d24ad990f572088ff60fe93a2ccc385228c672"
     },
     "src/assessments-domain.js": {
@@ -39,7 +39,7 @@
       "base260": "8c31dce20abc5dce2893d89c51127dd6a43ef168895e30810bc51205d9246712"
     },
     "src/assessments-compact.js": {
-      "sha256": "7412e48761803acd371259be4c07e08af8e94b4d7277cc930d52bcf1bd88a066",
+      "sha256": "84ab40ae987052f15234cbf51ddcddf4d1d42ba287fd7949ba8f13c300dd4458",
       "base260": "2264f6ca047e763540e7d603e846340df9907e638ad0bcb77a81d9f8c8031177"
     },
     "backend/server.js": {
@@ -47,11 +47,11 @@
       "base260": "c46c58842045c876a62fb7fceff6ecc692fb66f0cf36c8627cadc5e4bcb645a4"
     },
     "backend/assessments.js": {
-      "sha256": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163",
+      "sha256": "cccb4c6f8e2dcf3e37354ea6dfaa8a42cce1e08015e4e947539763042d187848",
       "base260": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163"
     },
     "backend/assessment-pdf.js": {
-      "sha256": "086af442e9a257513dd315ad08de12dcf2b162a451b4d142c17f6fad06cfd05b",
+      "sha256": "d147a6b721fb6fe17516e519eee485241eae56b208b1617a2aafc1fff213f3fc",
       "base260": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f"
     },
     "backend/pdf-font.js": {
