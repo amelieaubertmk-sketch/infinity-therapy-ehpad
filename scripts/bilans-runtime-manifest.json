@@ -31,7 +31,7 @@
       "base260": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f"
     },
     "src/assessments.js": {
-      "sha256": "ca7e2a7d2c0891aab90835359c4621de6a14d6d95cb4f1809b5bd4ec2acaa88f",
+      "sha256": "3dfe68be9212535857846521470310b53afe83ce323b04e14a94a457e732f000",
       "base260": "0e60b9f175986a320763c03702d24ad990f572088ff60fe93a2ccc385228c672"
     },
     "src/assessments-domain.js": {
@@ -47,15 +47,15 @@
       "base260": "c46c58842045c876a62fb7fceff6ecc692fb66f0cf36c8627cadc5e4bcb645a4"
     },
     "backend/assessments.js": {
-      "sha256": "cccb4c6f8e2dcf3e37354ea6dfaa8a42cce1e08015e4e947539763042d187848",
+      "sha256": "880058c6eba9fcbd769b744250705e2c9610701a11d32f9761758252c2f07390",
       "base260": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163"
     },
     "backend/assessment-pdf.js": {
-      "sha256": "d147a6b721fb6fe17516e519eee485241eae56b208b1617a2aafc1fff213f3fc",
+      "sha256": "3322ce030eadec6fbd11cbe3635997151ad27e8511c919737051d0ad50db3671",
       "base260": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f"
     },
     "backend/pdf-font.js": {
-      "sha256": "cd5a8295c6997116c29f181db58c1e2f162829f140162bad646cb9bc3daa4889",
+      "sha256": "5099f15e493c9868d7e15be46509010d9569ef2aa056f7a529e80bfd6cd4876f",
       "base260": "cd5a8295c6997116c29f181db58c1e2f162829f140162bad646cb9bc3daa4889"
     },
     "backend/database.js": {
@@ -92,6 +92,15 @@
     },
     "backend/topaze.js": {
       "sha256": "d73366d4297b768e8b24012dae42e9027d6c7757033b76408edd7c2a4ffb8298"
+    },
+    "assets/fonts/OpenSans-Regular.ttf": {
+      "sha256": "e64e508b2aa2880f907e470c4550980ec4c0694d103a43f36150ac3f93189bee"
+    },
+    "assets/fonts/OpenSans-Bold.ttf": {
+      "sha256": "5894a3649b213cf5b2d673b6e7a871815fd1d120fa68a463592f27db14eae323"
+    },
+    "assets/fonts/OpenSans-LICENSE.txt": {
+      "sha256": "f8da393148aa41984d22d5e607929f878fb3846885618d533708f80415f77265"
     }
   }
 }

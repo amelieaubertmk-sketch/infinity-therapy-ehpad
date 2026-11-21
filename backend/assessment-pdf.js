@@ -1,92 +1,359 @@
-import {walkingFields,anamnesisFields,testDefinitions,testResult,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,pomaItems,findingOptions,effectiveAids,effectiveTug,compactTinetti,timedInterpretation,testDescriptions,reviewLabel,recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
+import {walkingFields,anamnesisFields,jointFields,testDefinitions,testResult,tinettiScores,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
+import {muscleRows,findingOptions,effectiveAids,effectiveTug,compactTinetti,reviewLabel,
+ recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
-function wrap(text,width,size=10,bold=false){const lines=[];for(const raw of String(text??'').split('\n')){let line='';for(let word of raw.split(/\s+/)){if(line&&measuredWidth(line+' '+word,size,bold)>width){lines.push(line);line='';}while(measuredWidth(word,size,bold)>width){let cut=1;while(cut<word.length&&measuredWidth(word.slice(0,cut+1),size,bold)<=width)cut++;lines.push(word.slice(0,cut));word=word.slice(cut);}line+=(line?' ':'')+word;}lines.push(line);}return lines;}
+
+const pageWidth=595.28,pageHeight=841.89,margin=46,width=pageWidth-2*margin,top=745,bottom=51;
+const leading=14,bodySize=10.4;
+const dateFR=value=>new Date(value+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});
+const stamp=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris'});
+const normalize=value=>String(value??'').replace(/\s+/g,' ').trim();
+
+function wrap(value,max,size,bold=false){
+ const lines=[];
+ for(const paragraph of value.split('\n')){
+  let line='';
+  for(let word of paragraph.trim().split(/\s+/)){
+   const combined=line?line+' '+word:word;
+   if(measuredWidth(combined,size,bold)<=max){line=combined;continue;}
+   if(line){lines.push(line);line='';}
+   while(measuredWidth(word,size,bold)>max){
+    let cut=0,total=0;
+    for(const char of word){
+     total+=measuredWidth(char,size,bold);
+     if(total>max)break;
+     cut+=char.length;
+    }
+    lines.push(word.slice(0,cut));
+    word=word.slice(cut);
+   }
+   line=word;
+  }
+  if(line)lines.push(line);
+ }
+ return lines;
+}
+
+function anonymizer(record,previous){
+ const tokens=[record,previous,record.privacyResident].filter(Boolean)
+  .flatMap(item=>[item.id,item.residentId,item.residentCode,item.code,item.residentSector,item.sector,item.name,item.firstName,item.lastName,item.initials])
+  .filter(value=>typeof value==='string'&&value.trim()).sort((a,b)=>b.length-a.length);
+ const c=record.clinical;
+ const hidden=c.schema===2?[!c.observationsEnabled&&c.observations,!c.jointsEnabled&&c.joints].filter(Boolean):[];
+ const word=char=>char&&/[\p{L}\p{N}]/u.test(char);
+ return value=>{
+  let text=String(value??'');
+  for(const omit of hidden)text=text.split(omit).join('');
+  for(const token of tokens){
+   let offset=0;
+   while(offset<text.length){
+    const found=text.toLocaleLowerCase('fr-FR').indexOf(token.toLocaleLowerCase('fr-FR'),offset);
+    if(found<0)break;
+    if(!word(text[found-1])&&!word(text[found+token.length])){
+     const marker='[information retirée]';
+     text=text.slice(0,found)+marker+text.slice(found+token.length);
+     offset=found+marker.length;
+    }else offset=found+token.length;
+   }
+  }
+  return text;
+ };
+}
+
+function documentLayout(record,clean){
+ const {encode,build}=pdfFonts(),pages=[];
+ let commands,y;
+ const textCommands=(value,x,at,size,bold=false)=>encode(value,bold).map(({index,hex,width:advance})=>{
+  const command=`BT /F${index} ${size} Tf ${x.toFixed(2)} ${at.toFixed(2)} Td <${hex}> Tj ET`;
+  x+=advance*size/1000;
+  return command;
+ }).join('\n');
+ const text=(value,x,at,size=bodySize,bold=false)=>commands.push(bold?'0 g':'0.12 g',textCommands(value,x,at,size,bold));
+ const rule=(at,grey='0.82')=>commands.push(`${grey} G 0.5 w ${margin} ${at} m ${pageWidth-margin} ${at} l S`);
+ const page=()=>{
+  commands=[];
+  pages.push(commands);
+  y=top;
+  text('BILAN DIAGNOSTIQUE KINÉSITHÉRAPIQUE',margin,800,18,true);
+  text(clean(`Date : ${dateFR(record.date)}   ·   Examinateur : ${record.practitioner}   ·   ${record.type==='initial'?'Bilan initial':'Réévaluation'}`),margin,778);
+  rule(765);
+ };
+ const available=()=>y-bottom;
+ const ensure=height=>{if(available()<height)page();};
+ function paragraph(value,{bullet=false,justify=false}={}){
+  const indent=bullet?13:0,lineWidth=width-indent;
+  const groups=clean(value).trim().split(/\n\s*\n/).map(block=>wrap(block,lineWidth,bodySize)).filter(lines=>lines.length);
+  if(!groups.length)return null;
+  return {
+   min:Math.min(2,groups[0].length)*leading+4,
+   height:groups.reduce((total,lines)=>total+lines.length*leading+4,0),
+   draw(){
+    for(const lines of groups){
+     for(let i=0;i<lines.length;i++){
+      const remaining=lines.length-i;
+      ensure((remaining===2||i===0&&remaining>1?2:1)*leading);
+      if(bullet&&i===0)text('•',margin,y-10);
+      const words=lines[i].split(' '),extra=words.length>1?(lineWidth-measuredWidth(lines[i],bodySize))/(words.length-1):0;
+      if(justify&&i<lines.length-1&&extra>0&&extra<=2.5){
+       let x=margin+indent;
+       for(const word of words){
+        text(word,x,y-10);
+        x+=measuredWidth(word+' ',bodySize)+extra;
+       }
+      }else text(lines[i],margin+indent,y-10);
+      y-=leading;
+     }
+     y-=4;
+    }
+   }
+  };
+ }
+ function table(headers,rows,ratios=[0.34,0.66],showHeader=true){
+  const cellSize=9.7,cellLeading=12.5,headerHeight=19,rowPadding=5.5,after=6;
+  const widths=ratios.map(ratio=>width*ratio);
+  const positions=widths.map((_,i)=>margin+widths.slice(0,i).reduce((total,v)=>total+v,0)+9);
+  const cells=rows.filter(row=>row.slice(1).some(value=>clean(value).trim())).map(row=>
+   row.map((value,i)=>wrap(clean(value),widths[i]-18,cellSize,i===0))
+  );
+  if(!cells.length)return null;
+  const heights=cells.map(row=>Math.max(...row.map(col=>col.length)));
+  const initialHeader=showHeader?headerHeight:0;
+  const total=initialHeader+heights.reduce((sum,count)=>sum+rowPadding+count*cellLeading,0)+after;
+  const min=total<=165?total:initialHeader+rowPadding+Math.min(2,heights[0])*cellLeading;
+  const header=(repeat=false)=>{
+   if(!showHeader&&!repeat){rule(y);return;}
+   commands.push(`0.95 g ${margin} ${y-headerHeight} ${width} ${headerHeight} re f`);
+   headers.forEach((label,i)=>text(label,positions[i],y-13,cellSize,true));
+   y-=headerHeight;
+   rule(y);
+  };
+  return {min,draw(){
+   ensure(min);
+   header();
+   for(let r=0;r<cells.length;r++){
+    let offset=0;
+    while(offset<heights[r]){
+     const remaining=heights[r]-offset;
+     const fullHeight=remaining*cellLeading+rowPadding;
+     const keepRow=offset===0&&r>0&&fullHeight<=110;
+     if(available()<rowPadding+Math.min(2,remaining)*cellLeading||keepRow&&available()<fullHeight){
+      page();
+      header(true);
+     }
+     const count=Math.min(remaining,Math.floor((available()-rowPadding)/cellLeading));
+     for(let i=0;i<count;i++){
+      for(let col=0;col<positions.length;col++){
+       const value=cells[r][col][offset+i]||(col===0&&offset>0&&i===0?'(suite)':'');
+       if(value)text(value,positions[col],y-12-i*cellLeading,cellSize,col===0);
+      }
+     }
+     y-=count*cellLeading+rowPadding;
+     rule(y,'0.86');
+     offset+=count;
+    }
+   }
+   y-=after;
+  }};
+ }
+ function section(title,blocks,major=false,keepTogether=false){
+  const items=blocks.filter(Boolean);
+  if(!items.length)return null;
+  const spacing=major?29:20;
+  const groupHeight=keepTogether?items.reduce((total,item)=>total+item.height,0):Infinity;
+  const min=spacing+(groupHeight<=160?groupHeight:items[0].min);
+  return {min,draw(){
+   ensure(min);
+   if(major)rule(y-4);
+   text(title,margin,y-(major?22:14),major?13:11,true);
+   y-=spacing;
+   for(const item of items)item.draw();
+  }};
+ }
+ function finish(){
+  pages.forEach((content,i)=>{
+   const label=`Page ${i+1} / ${pages.length}`;
+   content.push('0.24 g',textCommands(label,(pageWidth-measuredWidth(label,9))/2,27,9));
+  });
+  return serializePDF(pages,build);
+ }
+ page();
+ return {paragraph,section,table,finish};
+}
+
+function compactSections(c,{section,paragraph,table}){
+ const subsection=(title,rows,column='Élément',showHeader=false)=>section(title,[table([column,'Résultat'],rows,undefined,showHeader)]);
+ const history=note=>paragraph(note,{justify:true});
+ const context=section('01 — Anamnèse et contexte clinique',[
+  c.reason.trim()&&history('Motif : '+c.reason),c.observationsEnabled&&history(c.observations)
+ ],true);
+ const mrc=[];
+ if(c.mrc.status==='Non réalisable'){
+  const extra=c.mrc.reason==='Autre motif'&&c.mrc.other?' : '+c.mrc.other:'';
+  mrc.push(paragraph('Testing musculaire non réalisable'+(c.mrc.reason?' — '+c.mrc.reason+extra:'')));
+ }else if(c.mrc.status==='Réalisable'){
+  for(const [group,label] of [['upper','Membres supérieurs'],['lower','Membres inférieurs']]){
+   const side=cell=>cell.value==='NE'?'NE'+(cell.reason?' ('+cell.reason+')':''):cell.value?cell.value+'/5':'';
+   const measures=muscleRows.filter(([, ,area])=>area===group)
+    .map(([id,movement])=>[movement,side(c.mrc.cells[id+'R']),side(c.mrc.cells[id+'L'])]);
+   mrc.push(table([label,'Droite','Gauche'],measures,[0.44,0.28,0.28]));
+  }
+  if(mrc.some(Boolean)&&Object.values(c.mrc.cells).some(cell=>cell.value==='NE'))mrc.push(paragraph('NE : non évaluable.'));
+  if(!mrc.some(Boolean))mrc.push(paragraph('Testing indiqué comme réalisable.'));
+ }
+ const walk=[
+  ['Possibilité de marche',c.walk.possible],
+  ['Aide utilisée',c.walk.possible==='Possible'?effectiveAids(c).join(', '):''],
+  ['Périmètre',c.walk.possible==='Possible'&&c.walk.distance!==''?c.walk.distance+' m':''],
+  ['Fauteuil roulant habituel',c.walk.wheelchair]
+ ];
+ const tinetti=[];
+ if(c.tinetti.status==='Non réalisable')tinetti.push(['Résultat','Non réalisable'+(c.tinetti.reason?' — '+c.tinetti.reason:'')]);
+ else if(c.tinetti.status==='Réalisé'){
+  const scores=compactTinetti(c);
+  for(const [key,label,max] of [['balance','Équilibre',16],['gait','Marche',12],['total','Total',28]])if(scores[key]!==null)tinetti.push([label,scores[key]+'/'+max]);
+  tinetti.push(['Interprétation',scores.interpretation]);
+  const aids=effectiveAids(c,c.tinetti);
+  if(aids.length)tinetti.push(['Aides utilisées',aids.join(', ')]);
+ }
+ const tug=effectiveTug(c),tugRows=[];
+ if(tug.status==='Réalisé'){
+  if(tug.time)tugRows.push(['Temps',tug.time+' secondes']);
+  if(tug.details&&tugRisk(tug))tugRows.push(['Interprétation',tugRisk(tug)+'. '+tugContext+' '+tugVigilance]);
+  if(!tug.details){
+   tugRows.push(['Aides utilisées',effectiveAids(c,tug).join(', ')]);
+   if(tug.protocol==='Adapté')tugRows.push(['Précaution','Passation adaptée — résultat descriptif.']);
+  }
+  if(tug.details?.humanAssistance==='Aide physique')tugRows.push(['Précaution',tugPhysicalAssistance]);
+ }else if(tug.status==='Non réalisable'){
+  tugRows.push(['Résultat',tug.reason?'Non réalisable — '+tug.reason:'Test impossible']);
+  if(tug.details)tugRows.push(['Interprétation',tugRisk(tug)]);
+ }
+ if(tug.status)tugRows.push(...recordedTugDetails(tug));
+
+ const chair=c.chair,sts=chairStatus(chair),chairRows=[];
+ if(sts==='Réalisé'){
+  chairRows.push(['Temps',chair.time?chair.time+' secondes':'']);
+  chairRows.push(['Utilisation des bras',chairArms.find(([value])=>value===chair.arms)?.[1]]);
+  chairRows.push(['Assistance humaine',chair.humanAssistance]);
+ }else if(sts==='Non réalisé')chairRows.push(['Résultat',sts]);
+ if(sts==='Impossible'&&chair.reason)chairRows.push(['Motif',chair.reason]);
+ if(sts){
+  chairRows.push(['Interprétation',chairResult(chair).messages.join('. ')]);
+  chairRows.push(['Observations complémentaires',chair.notes]);
+ }
+
+ const exam=section('02 — Examen clinique et fonctionnel',[
+  section('2.1 — Testing musculaire',mrc),
+  subsection('2.2 — Marche',walk),
+  subsection('2.3 — Tinetti POMA 28',tinetti,'Mesure',c.tinetti.status==='Réalisé'),
+  subsection('2.4 — Timed Up and Go (TUG)',tugRows,'TUG · Mesure ou observation'),
+  subsection('2.5 — Five Times Sit-to-Stand (5xSTS)',chairRows),
+  c.jointsEnabled&&section('2.6 — Bilan articulaire',[history(c.joints)]),
+  subsection('2.7 — Transferts',[['Lit-fauteuil',c.transfers.bedChair],['Assis-debout',c.transfers.sitStand]]),
+  section('2.8 — Constats retenus par l’évaluateur',findingOptions.filter(([id])=>c.findings.includes(id)).map(([,label])=>paragraph(label,{bullet:true})),false,true)
+ ],true);
+ return [context,exam];
+}
+
+function historicalSections(c,{section,paragraph,table}){
+ const history=section('01 — Anamnèse et contexte clinique',anamnesisFields.map(([id,label])=>
+  c.anamnesis[id].trim()&&paragraph(label+' : '+c.anamnesis[id],{justify:true})
+ ),true);
+ const walkTest=testDefinitions.find(def=>def.id==='walk');
+ const walking=section('2.1 — Marche',[table(['Élément','Résultat'],[
+  ...walkingFields.map(([id,label])=>[label,c.walking[id]]),
+  ['Évaluation fonctionnelle',c.tests.walk.status==='Réalisé'?testResult(walkTest,c.tests.walk):''],
+  ['Observations',c.tests.walk.conditions]
+ ])]);
+ const groups=[
+  ['Testing musculaire',testDefinitions.filter(def=>def.label.startsWith('MRC'))],
+  ['Tinetti POMA 28',testDefinitions.filter(def=>def.id==='tinetti')],
+  ['Timed Up and Go (TUG)',testDefinitions.filter(def=>def.id==='tug')],
+  ['Five Times Sit-to-Stand (5xSTS)',testDefinitions.filter(def=>def.id==='fiveChair')],
+  ['Autres observations fonctionnelles',testDefinitions.filter(def=>!def.label.startsWith('MRC')&&!['walk','tinetti','tug','fiveChair'].includes(def.id))]
+ ];
+ const tests=groups.map(([label,definitions])=>section(label,[table(['Élément','Résultat'],definitions.filter(def=>c.tests[def.id].status==='Réalisé').flatMap(def=>{
+  const result=c.tests[def.id];
+  const includeConditions=!['tinetti','tug','fiveChair'].includes(def.id);
+  const details=includeConditions&&result.conditions?' — '+result.conditions:'';
+  if(def.id==='tinetti'&&result.status==='Réalisé'){
+   const {balance,gait,total}=tinettiScores(result);
+   const rows=[['Équilibre',balance+'/16'],['Marche',gait+'/12'],['Total',total+'/28']];
+   for(const [id,item,max] of [...balanceItems,...gaitItems])rows.push([item,result.items[id]+'/'+max]);
+   return rows;
+  }
+  return [[def.label,testResult(def,result)+details]];
+ }),undefined,false)]));
+ const unperformed=new Map();
+ for(const def of testDefinitions){
+  const test=c.tests[def.id];
+  if(test.status==='Réalisé')continue;
+  const result=testResult(def,test);
+  const details=!['tinetti','tug','fiveChair'].includes(def.id)&&test.conditions?' — '+test.conditions:'';
+  const label=result+details;
+  if(!unperformed.has(label))unperformed.set(label,[]);
+  unperformed.get(label).push(def.label);
+ }
+ const unperformedTests=section('Tests non réalisés ou non évaluables',[
+  table(['Statut et motif','Tests'],[...unperformed].map(([label,tests])=>[label,tests.join(' · ')]),undefined,false)
+ ]);
+ const joints=section('Bilan articulaire',[table(['Élément','Résultat'],jointFields.map(([id,label])=>[label,c.joints?.[id]]))]);
+ const findings=section('Constats retenus par l’évaluateur',[
+  ...findingOptions.filter(([id])=>c.findings.includes(id)).map(([,label])=>paragraph(label,{bullet:true})),
+  paragraph(c.evidence,{justify:true})
+ ]);
+ return [history,section('02 — Examen clinique et fonctionnel',[walking,...tests,unperformedTests,joints,findings],true)];
+}
 
 export function assessmentPDF(record,previous){
- const dateFR=value=>new Date(value+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'}),stamp=value=>new Date(value).toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' (Paris)';
- const privateTokens=[record,previous,record.privacyResident].filter(Boolean).flatMap(r=>[r.id,r.residentId,r.residentCode,r.code,r.residentSector,r.sector,r.name,r.firstName,r.lastName,r.initials]).filter(v=>typeof v==='string'&&v.trim()).sort((a,b)=>b.length-a.length);
- const hiddenTexts=record.clinical.schema===2?[!record.clinical.observationsEnabled&&record.clinical.observations,!record.clinical.jointsEnabled&&record.clinical.joints].filter(Boolean):[];
- const word=c=>c&&/[\p{L}\p{N}]/u.test(c);
- const clean=value=>{let text=String(value??'');for(const hidden of hiddenTexts)text=text.split(hidden).join('');for(const token of privateTokens){let offset=0;while(offset<text.length){const at=text.toLocaleLowerCase('fr-FR').indexOf(token.toLocaleLowerCase('fr-FR'),offset);if(at<0)break;if(!word(text[at-1])&&!word(text[at+token.length])){text=text.slice(0,at)+'[information retirée]'+text.slice(at+token.length);offset=at+21;}else offset=at+token.length;}}return text;};
- const {encode,build}=pdfFonts();const pages=[];let commands=[],y=742;
- const text=(value,x,at,size=10,bold=false)=>{value=clean(value);commands.push(`0.12 0.18 0.28 rg BT /${bold?'F2':'F1'} ${size} Tf ${x} ${at} Td ${encode(value,bold)} Tj ET`);};
- const page=()=>{if(commands.length)pages.push(commands.join('\n'));commands=[];y=742;text('INFINITY THERAPY',40,805,16,true);text('Bilan diagnostic kinésithérapique',40,784,12,true);text(`${dateFR(record.date)} | ${record.practitioner} | ${record.type==='initial'?'Bilan initial':'Réévaluation'}`,40,762,10);};
- const ensure=h=>{if(y-h<55)page();};
- const paragraph=(value,bold=false)=>{for(const block of clean(value).split(/\n\s*\n/)){const lines=wrap(block,515,10,bold).filter(line=>line.trim());if(!lines.length)continue;if(lines.length<=8)ensure(lines.length*14+6);for(let i=0;i<lines.length;i++){ensure(lines.length-i===2?28:14);text(lines[i],40,y,10,bold);y-=14;}y-=6;}};
- const section=title=>{ensure(60);y-=8;paragraph(title,true);};
- const row=(left,right)=>{const a=wrap(clean(left),190,9),b=wrap(clean(right),300,9);let offset=0;while(offset<Math.max(a.length,b.length)){ensure(38);const count=Math.min(Math.max(a.length,b.length)-offset,Math.max(1,Math.floor((y-67)/13))),height=count*13+12;commands.push(`0.85 G 40 ${y-height+7} m 555 ${y-height+7} l S 0 G`);for(let i=0;i<count;i++){text(a[offset+i]||(offset>0&&i===0?'(suite)':''),44,y-i*13,9);text(b[offset+i]||'',248,y-i*13,9);}y-=height;offset+=count;if(offset<Math.max(a.length,b.length))page();}};
- const triple=(name,right,left,header=false)=>{const cols=[wrap(clean(name),210,9,header),wrap(clean(right),135,9,header),wrap(clean(left),145,9,header)],height=Math.max(...cols.map(c=>c.length))*13+12;if(y-height<55){page();if(!header)triple('Mouvement','Droite','Gauche',true);}commands.push(`0.85 G 40 ${y-height+7} m 555 ${y-height+7} l S 0 G`);for(let i=0;i<Math.max(...cols.map(c=>c.length));i++)for(const [j,x] of [44,260,405].entries())text(cols[j][i]||'',x,y-i*13,9,header);y-=height;};
- function compactBody(){const c=record.clinical;section('01 — Anamnèse et contexte clinique');if(c.reason.trim())paragraph('Motif : '+c.reason);if(c.observationsEnabled&&c.observations.trim())paragraph('Observations : '+c.observations);section('02 — Examen clinique et fonctionnel');
- paragraph('2.1 — Testing musculaire',true);if(c.mrc.status==='Non réalisable')paragraph('Testing musculaire non réalisable — '+c.mrc.reason+(c.mrc.reason==='Autre motif'&&c.mrc.other?' : '+c.mrc.other:''));else if(c.mrc.status==='Réalisable'){for(const group of ['upper','lower']){const rows=muscleRows.filter(([id,,g])=>g===group&&(c.mrc.cells[id+'R'].value||c.mrc.cells[id+'L'].value));if(!rows.length)continue;paragraph(group==='upper'?'Membres supérieurs — mouvements fonctionnels (protocole à contextualiser)':'Membres inférieurs',true);triple('Mouvement','Droite','Gauche',true);for(const [id,label] of rows){const side=s=>{const x=c.mrc.cells[id+s];return !x.value?'—':x.value==='NE'?'NE'+(x.reason?' ('+x.reason+')':''):x.value+'/5';};triple(label,side('R'),side('L'));}}if(Object.values(c.mrc.cells).some(x=>x.value==='NE'))paragraph('NE : non évaluable. Une valeur absente ou NE ne vaut jamais zéro.');}
- paragraph('2.2 — Marche',true);if(c.walk.possible)paragraph('Marche '+c.walk.possible.toLowerCase()+'.');if(c.walk.possible==='Possible'){const aids=effectiveAids(c);paragraph('Aide à la marche : '+(aids.length?aids.join(', '):'aucune lors de l’observation'));if(c.walk.distance!=='')paragraph('Périmètre renseigné : '+c.walk.distance+' m');}if(c.walk.wheelchair)paragraph('Fauteuil roulant habituel : '+c.walk.wheelchair);
- function tugBody(c,tug){
-  if(tug.status==='Non réalisable'){
-   paragraph(tug.reason?'Non réalisable — '+tug.reason:'Test impossible');
-  }
-  if(tug.details){
-   if(tug.status==='Réalisé')paragraph('Temps : '+tug.time+' secondes');
-   const risk=tugRisk(tug);
-   if(risk)paragraph('Interprétation : '+risk);
-   if(risk&&tug.status==='Réalisé')paragraph(tugContext+' '+tugVigilance);
-   for(const [label,value] of recordedTugDetails(tug))paragraph(label+' : '+value);
-   if(tug.status==='Réalisé'&&tug.details.humanAssistance==='Aide physique')paragraph(tugPhysicalAssistance);
-  }else if(tug.status==='Réalisé'){
-   paragraph(timedInterpretation(c,'tug'));
-   const aids=effectiveAids(c,tug);
-   if(aids.length)paragraph('Aides utilisées : '+aids.join(', '));
-   if(tug.conditions.trim())paragraph('Conditions : '+tug.conditions);
-   if(tug.protocol)paragraph('Protocole : '+tug.protocol);
-  }
- }
- function chairBody(c,chair){
-  const status=chairStatus(chair);
-  if(chair.humanAssistance===undefined){
-   if(status==='Impossible'){paragraph('Non réalisable — '+chair.reason);return;}
-   if(status==='Réalisé'){
-    paragraph(timedInterpretation(c,'chair'));
-    if(chair.arms)paragraph('Utilisation des bras : '+chair.arms);
-    if(chair.conditions.trim())paragraph('Conditions : '+chair.conditions);
-    if(chair.protocol)paragraph('Protocole : '+chair.protocol);
-   }else paragraph(status);
-   return;
-  }
-  if(status==='Réalisé'){
-   if(chair.time)paragraph('Temps : '+chair.time+' secondes');
-   const armsLabel=chairArms.find(([value])=>value===chair.arms)?.[1];
-   if(armsLabel)paragraph('Utilisation des bras : '+armsLabel);
-   if(chair.humanAssistance)paragraph('Assistance humaine : '+chair.humanAssistance);
-  }else if(status==='Non réalisé')paragraph(status);
-  for(const message of chairResult(chair).messages)paragraph(message);
-  if(chair.reason&&status==='Impossible')paragraph('Motif : '+chair.reason);
-  if(chair.notes.trim())paragraph('Observations complémentaires : '+chair.notes.trim());
- }
- for(const [key,title] of [['tug','2.3 — Timed Up and Go (TUG)'],['tinetti','2.4 — Tinetti POMA 28'],['chair','2.5 — Five Times Sit-to-Stand (5xSTS)']]){
-  const t=key==='tug'?effectiveTug(c):c[key];
-  if(!t.status)continue;
-  paragraph(title,true);
-  paragraph(testDescriptions[key]);
-  if(key==='tug'){tugBody(c,t);continue;}
-  if(key==='chair'){chairBody(c,t);continue;}
-  if(t.status==='Non réalisable'){paragraph('Non réalisable — '+t.reason);continue;}
-  const scores=compactTinetti(c);
-  if(scores.balance!==null)row('Équilibre',scores.balance+'/16');
-  if(scores.gait!==null)row('Marche',scores.gait+'/12');
-  if(scores.total!==null)row('Total',scores.total+'/28');
-  paragraph(scores.interpretation);
-  paragraph('Référence : POMA 28, Tinetti (1986) ; repères conventionnels de dépistage à contextualiser.');
-  if(scores.partial)paragraph('Les observations évaluables sont conservées dans l’application ; aucun total complet n’est attribué.');
-  paragraph('Aides utilisées : '+(effectiveAids(c,t).join(', ')||'aucune renseignée'));
-  if(t.conditions.trim())paragraph('Conditions : '+t.conditions);
-  if(t.protocol)paragraph('Protocole : '+t.protocol);
- }
- if(c.jointsEnabled&&c.joints.trim()){paragraph('2.6 — Bilan articulaire',true);paragraph(c.joints);}const transfers=Object.entries(c.transfers).filter(([,v])=>v);if(transfers.length){paragraph('2.7 — Transferts',true);for(const [key,value] of transfers)row(key==='bedChair'?'Lit-fauteuil':'Assis-debout',value);}if(c.findings.length){paragraph('2.8 — Constats retenus par l’évaluateur',true);for(const [id,label] of findingOptions)if(c.findings.includes(id))paragraph(label);}}
- page();paragraph(`Document finalisé — validation : ${stamp(record.finalizedAt)} — ${record.finalizedBy}`);if(record.clinical.schema===2){compactBody();}else{section('01 — Anamnèse et contexte clinique');for(const [id,label] of anamnesisFields)if(record.clinical.anamnesis[id].trim())paragraph(label+' : '+record.clinical.anamnesis[id]);section('2. Examen clinique et fonctionnel');for(const [id,label] of walkingFields)if(record.clinical.walking[id].trim())paragraph(label+' : '+record.clinical.walking[id]);const omitted=new Map();for(const def of testDefinitions){const t=record.clinical.tests[def.id];if(t.status!=='Réalisé'){const key=testResult(def,t)+(t.conditions?' | Conditions : '+t.conditions:'');omitted.set(key,[...(omitted.get(key)||[]),def.label]);continue;}const result=testResult(def,t)+(t.conditions?' | Conditions : '+t.conditions:'');if(result.length<1500)row(def.label,result);else{paragraph(def.label,true);paragraph(result);}if(def.id==='tinetti')for(const [id,label,max] of [...balanceItems,...gaitItems])row(label,`${t.items[id]}/${max}`);}for(const [reason,labels] of omitted){paragraph(reason,true);paragraph(labels.join(' ; '));}
+ const clean=anonymizer(record,previous),layout=documentLayout(record,clean);
+ const {section,paragraph,table}=layout;
+ const clinical=record.clinical.schema===2?compactSections(record.clinical,layout):historicalSections(record.clinical,layout);
+ const objectives=[...new Set(clean(record.project).split('\n').map(line=>normalize(line.replace(/^\s*(?:[•*–-]|\d+[.)])\s+/,''))).filter(Boolean))];
+ const validation=(date,author)=>date&&paragraph('Validation : '+stamp(date)+(author?' — '+author:''));
+ const sectionValidation=(date,author)=>date===record.finalizedAt&&author===record.finalizedBy?null:validation(date,author);
+ const review=record.clinical.schema===2?
+  record.reviewWindow&&paragraph('Échéance de réévaluation : '+reviewLabel(record)):
+  record.reviewDate&&paragraph('Échéance de réévaluation : '+dateFR(record.reviewDate));
+ const blocks=[
+  validation(record.finalizedAt,record.finalizedBy),...clinical,
+  section('03 — Diagnostic kinésithérapique',[paragraph(normalize(clean(record.diagnosis)),{justify:true}),sectionValidation(record.diagnosisValidatedAt,record.diagnosisValidatedBy)],true),
+  section('04 — Projet thérapeutique',[
+   ...objectives.map(value=>paragraph(value,{bullet:true})),
+   record.clinical.schema!==2&&record.frequency&&paragraph('Fréquence : '+record.frequency),
+   record.clinical.schema!==2&&record.duration&&paragraph('Durée : '+record.duration),
+   review,sectionValidation(record.projectValidatedAt,record.projectValidatedBy)
+  ],true)
+ ];
+ if(previous){
+  const rows=comparison(previous.clinical,record.clinical).map(item=>[item.label,item.previous,item.current,item.delta]);
+  blocks.push(section('05 — Comparaison avec le bilan du '+dateFR(previous.date),[
+   table(['Mesure','Antérieur','Actuel','Évolution'],rows,[0.28,0.24,0.24,0.24]),
+   paragraph(record.evolution,{justify:true})
+  ],true));
+ }else if(record.evolution)blocks.push(section('05 — Évolution clinique',[paragraph(record.evolution,{justify:true})],true));
+ for(const block of blocks.filter(Boolean))block.draw();
+ return layout.finish();
 }
- section('03 — Diagnostic kinésithérapique');paragraph(record.diagnosis);paragraph(`Validation : ${stamp(record.diagnosisValidatedAt)} — ${record.diagnosisValidatedBy}`);section('04 — Projet thérapeutique');paragraph(record.project);if(record.clinical.schema===2)paragraph('Échéance de réévaluation : '+reviewLabel(record));else paragraph(`Fréquence : ${record.frequency} | Durée : ${record.duration} | Réévaluation : ${dateFR(record.reviewDate)}`);paragraph(`Validation : ${stamp(record.projectValidatedAt)} — ${record.projectValidatedBy}`);
- if(previous){section('5. Comparaison avec le bilan du '+dateFR(previous.date));for(const c of comparison(previous.clinical,record.clinical)){paragraph(c.label,true);row('Antérieur',c.previous);row('Actuel',c.current);row('Évolution chiffrée',c.delta);}if(record.evolution)paragraph('Interprétation clinique : '+record.evolution);}
- if(commands.length)pages.push(commands.join('\n'));
- const objects=[],add=v=>{objects.push(v);return objects.length;};const catalog=add(''),tree=add('');const footers=pages.map((_,i)=>encode(`Infinity Therapy | Document confidentiel | Page ${i+1}/${pages.length}`));const [f1,f2]=build(add);const kids=[];
- pages.forEach((content,i)=>{content+=`\nBT /F1 8 Tf 40 30 Td ${footers[i]} Tj ET`;const bytes=Buffer.from(content,'latin1');const stream=add(Buffer.concat([Buffer.from(`<< /Length ${bytes.length} >>\nstream\n`),bytes,Buffer.from('\nendstream')]));kids.push(add(`<< /Type /Page /Parent ${tree} 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 ${f1} 0 R /F2 ${f2} 0 R >> >> /Contents ${stream} 0 R >>`));});objects[catalog-1]=`<< /Type /Catalog /Pages ${tree} 0 R >>`;objects[tree-1]=`<< /Type /Pages /Count ${kids.length} /Kids [${kids.map(id=>id+' 0 R').join(' ')}] >>`;
- const parts=[Buffer.from('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n','latin1')],offsets=[0];let length=parts[0].length;objects.forEach((obj,i)=>{offsets.push(length);const chunk=Buffer.concat([Buffer.from(`${i+1} 0 obj\n`),Buffer.isBuffer(obj)?obj:Buffer.from(obj,'latin1'),Buffer.from('\nendobj\n')]);parts.push(chunk);length+=chunk.length;});const xref=length;parts.push(Buffer.from(`xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')}trailer\n<< /Size ${objects.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`));return Buffer.concat(parts);
+
+function serializePDF(pages,buildFonts){
+ const objects=[],add=value=>objects.push(value),catalog=add(''),tree=add('');
+ const fonts=buildFonts(add),kids=pages.map(commands=>{
+  const bytes=Buffer.from(commands.join('\n'),'latin1');
+  const stream=add(Buffer.concat([Buffer.from(`<< /Length ${bytes.length} >>\nstream\n`),bytes,Buffer.from('\nendstream')]));
+  return add(`<< /Type /Page /Parent ${tree} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << ${fonts} >> >> /Contents ${stream} 0 R >>`);
+ });
+ objects[catalog-1]=`<< /Type /Catalog /Pages ${tree} 0 R >>`;
+ objects[tree-1]=`<< /Type /Pages /Count ${kids.length} /Kids [${kids.map(id=>id+' 0 R').join(' ')}] >>`;
+ const parts=[Buffer.from('%PDF-1.4\n%\xe2\xe3\xcf\xd3\n','latin1')],offsets=[0];
+ let length=parts[0].length;
+ objects.forEach((obj,i)=>{
+  offsets.push(length);
+  const chunk=Buffer.concat([Buffer.from(`${i+1} 0 obj\n`),Buffer.isBuffer(obj)?obj:Buffer.from(obj,'latin1'),Buffer.from('\nendobj\n')]);
+  parts.push(chunk);
+  length+=chunk.length;
+ });
+ const xref=length;
+ parts.push(Buffer.from(`xref\n0 ${objects.length+1}\n0000000000 65535 f \n${offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')}trailer\n<< /Size ${objects.length+1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`));
+ return Buffer.concat(parts);
 }

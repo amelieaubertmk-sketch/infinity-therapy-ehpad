@@ -60,7 +60,7 @@ test('TUG PDF omits blank fields, retains observations when impossible and reads
   const result=spawnSync('pdftotext',['-','-'],{input:assessmentPDF(record),encoding:'utf8'});
   if(result.error?.code==='ENOENT')return null;
   assert.equal(result.status,0,result.stderr);
-  return result.stdout.split('2.3 — Timed Up and Go (TUG)')[1].split('2.4 — Tinetti')[0];
+  return result.stdout.split('2.4 — Timed Up and Go (TUG)')[1].split('2.5 — Five Times')[0].replace(/\s+/g,' ');
  };
  const tug=record.clinical.tug;
  tug.reason='';
@@ -69,18 +69,17 @@ test('TUG PDF omits blank fields, retains observations when impossible and reads
  const impossible=extract();
  if(impossible===null){t.skip('pdftotext indisponible');return;}
  assert.match(impossible,/Risque de chute non évaluable par le TUG/);
- assert.match(impossible,/Aide technique : Aucune/);
- assert.match(impossible,/Observations : Hésitation/);
- assert.doesNotMatch(impossible,/Temps :|Assistance humaine|Transfert assis-debout|Observations complémentaires|Instabilité/);
+ assert.match(impossible,/Aide technique Aucune/);
+ assert.match(impossible,/Observations Hésitation/);
+ assert.doesNotMatch(impossible,/Temps|Assistance humaine|Transfert assis-debout|Observations complémentaires|Instabilité/);
 
  delete tug.details;
  Object.assign(tug,{status:'Réalisé',time:'18',protocol:'Adapté',conditions:'Conditions historiques',aidsOverride:true,aids:['Canne simple']});
  assert.doesNotThrow(()=>validateCompact(record.clinical,true));
  const legacy=extract();
  assert.match(legacy,/18 secondes/);
- assert.match(legacy,/Aides utilisées : Canne simple/);
- assert.match(legacy,/Conditions : Conditions historiques/);
- assert.match(legacy,/Protocole : Adapté/);
+ assert.match(legacy,/Aides utilisées Canne simple/);
+ assert.doesNotMatch(legacy,/Conditions historiques|Protocole : Adapté/);
  assert.doesNotMatch(legacy,/Risque de chute faible|Risque de chute modéré/);
 });
 test('5xSTS thresholds, adaptations, incomplete inputs and impossible or unperformed tests',()=>{
@@ -182,7 +181,7 @@ test('5xSTS PDF keeps impossible-test notes and reports only applicable interpre
   const result=spawnSync('pdftotext',['-','-'],{input:assessmentPDF(record),encoding:'utf8'});
   if(result.error?.code==='ENOENT')return null;
   assert.equal(result.status,0,result.stderr);
-  return result.stdout.split('2.5 — Five Times Sit-to-Stand (5xSTS)')[1].split('03 — Diagnostic')[0];
+  return result.stdout.split('2.5 — Five Times Sit-to-Stand (5xSTS)')[1].split('03 — Diagnostic')[0].replace(/\s+/g,' ');
  };
  Object.assign(chair,{status:'Impossible',reason:'',notes:'Interruption fictive.'});
  const impossible=extract();
@@ -214,4 +213,117 @@ test('API: soft delete/restore, authorization, finalized immutability, Titan tra
  const reeval=await call('','POST',{residentId:r.residentId,date:'2026-12-12',practitioner:'Alexandre',clinicalSchema:2,previousId:r.id});assert.equal(reeval.status,201);const second=reeval.data.assessment;assert.equal(second.type,'reevaluation');assert.equal(second.previousId,r.id);assert.equal(second.clinical.reason,r.clinical.reason);assert.ok(Object.values(second.clinical.mrc.cells).every(x=>x.value===''));assert.equal(second.clinical.walk.possible,'');assert.equal(second.clinical.observations,r.clinical.observations);assert.equal((await call('/'+second.id+'/trash','POST',{revision:second.revision,confirmation:'SUPPRIMER LE BROUILLON'})).status,200);
  const backupFile=path.join(dir,'backup.sqlite');await backup(app.db,backupFile);const copy=new DatabaseSync(backupFile,{readOnly:true});assert.equal(copy.prepare('SELECT count(*) AS n FROM assessment_documents').get().n,2);assert.ok(copy.prepare('SELECT count(*) AS n FROM assessment_versions').get().n>=4);assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check,'ok');copy.close();await new Promise(resolve=>app.server.close(resolve));app.close();app=createApp({directory:dir,origin:'http://localhost:31009'});assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(legacy.id).data,legacyRaw);assert.ok(app.db.prepare('SELECT deleted_at FROM assessment_tracking WHERE assessment_id=?').get(second.id).deleted_at);assert.ok(app.db.prepare('SELECT titan_at FROM assessment_tracking WHERE assessment_id=?').get(r.id).titan_at);
  }finally{if(app.server.listening)await new Promise(resolve=>app.server.close(resolve));app.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test('PDF layout keeps transfers together, repeats long-table headers and uses only the approved text',t=>{
+ const c=complete(),stamp='2026-11-12T12:00:00Z';
+ c.walk.distance='15';
+ c.transfers={bedChair:'Autonome',sitStand:'Assistance partielle'};
+ const record={date:'2026-11-12',practitioner:'Amélie',type:'initial',clinical:c,reviewWindow:'3m',
+  finalizedAt:stamp,finalizedBy:'Amélie',diagnosisValidatedAt:stamp,diagnosisValidatedBy:'Amélie',
+  projectValidatedAt:stamp,projectValidatedBy:'Amélie',
+  diagnosis:'Conclusion clinique fictive validée.\n\nDeuxième phrase approuvée.',
+  project:'Sécuriser les déplacements.\nEntretenir la mobilité du genou.\nSécuriser les déplacements.',
+  proposal:{diagnosis:'PROPOSITION_NON_VALIDÉE'}};
+ const extract=()=>{
+  const result=spawnSync('pdftotext',['-layout','-','-'],{input:assessmentPDF(record),encoding:'utf8'});
+  if(result.error?.code==='ENOENT')return null;
+  assert.equal(result.status,0,result.stderr);
+  return result.stdout.trim().split('\f').map(page=>page.trim());
+ };
+ const short=extract();
+ if(short===null){t.skip('pdftotext indisponible');return;}
+ assert.equal(short.length,1);
+ const normalized=short[0].replace(/\s+/g,' ');
+ assert.match(normalized,/BILAN DIAGNOSTIQUE KINÉSITHÉRAPIQUE/);
+ assert.match(normalized,/Validation : 12\/11\/2026.*Amélie/);
+ assert.match(normalized,/Conclusion clinique fictive validée\. Deuxième phrase approuvée\./);
+ assert.equal(normalized.match(/Sécuriser les déplacements\./g).length,1);
+ assert.match(normalized,/Page 1 \/ 1$/);
+ assert.doesNotMatch(normalized,/Infinity Therapy|\(Paris\)|PROPOSITION_NON_VALIDÉE/i);
+ assert.ok(normalized.indexOf('Tinetti POMA')<normalized.indexOf('Timed Up and Go'));
+ assert.match(normalized,/Transferts Lit-fauteuil Autonome Assis-debout Assistance partielle/);
+
+ c.tug.status='Réalisé';
+ c.tug.time='22';
+ c.tug.details.notes=Array.from({length:80},(_,i)=>'Observation locale fictive '+(i+1)+'. Le changement de direction est réalisé après une pause.').join('\n');
+ const long=extract();
+ assert.ok(long.length>=3);
+ assert.ok(long.some(page=>/TUG · Mesure ou observation/.test(page)&&/\(suite\)/.test(page)));
+ assert.ok(long.some(page=>/Observation locale fictive 80/.test(page)));
+ const transfersPage=long.find(page=>page.includes('2.7 — Transferts'));
+ assert.match(transfersPage,/Lit-fauteuil\s+Autonome/);
+ assert.match(transfersPage,/Assis-debout\s+Assistance partielle/);
+ for(const [i,page] of long.entries()){
+  assert.match(page,new RegExp('Page '+(i+1)+' / '+long.length+'$'));
+  assert.ok(page.split('\n').filter(line=>line.trim()).length>6,'Page presque vide');
+ }
+});
+
+test('permanent deletion verifies active storage, clears dependent cache and preserves other assessments',async()=>{
+ const directory=mkdtempSync(path.join(tmpdir(),'infinity-assessment-purge-'));
+ const origin='http://localhost:31029',app=createApp({directory,origin});
+ try{
+  const state=seed(),resident=state.residents[0];
+  app.db.prepare('UPDATE state SET data=?').run(JSON.stringify(state));
+  const baseline=app.db.prepare('SELECT * FROM state').get(),sessions={};
+  for(const [id,role] of [['owner','kine'],['colleague','kine'],['secretary','secretariat']]){
+   app.db.prepare('INSERT INTO users VALUES(?,?,?,?,?,1)').run(id,id,id,role,'unused');
+   sessions[id]=newSession(app.db,id);
+  }
+  const stamp='2026-11-12T12:00:00Z';
+  const record=(id,previousId=null)=>({id,previousId,residentId:resident.id,residentCode:resident.code,owner:'owner',status:'final',type:previousId?'reevaluation':'initial',
+   date:previousId?'2026-11-12':'2026-10-01',practitioner:'Amélie',clinical:complete(),reviewWindow:'3m',
+   diagnosis:'Conclusion fictive.',project:'Objectif fictif.',finalizedAt:stamp,finalizedBy:'Amélie'});
+  const old=record('bilan-a-effacer'),child=record('reevaluation-fictive',old.id),unrelated=record('bilan-independant');
+  for(const entry of [old,child,unrelated]){
+   app.db.prepare('INSERT INTO assessments VALUES(?,?,?,?,1,?)').run(entry.id,entry.residentId,entry.owner,entry.status,JSON.stringify(entry));
+   app.db.prepare('INSERT INTO assessment_versions(assessment_id,at,actor,data) VALUES(?,?,?,?)').run(entry.id,stamp,entry.owner,JSON.stringify(entry));
+   app.db.prepare('INSERT INTO assessment_documents VALUES(?,?,?,2)').run(entry.id,Buffer.from('ancienne présentation'),stamp);
+  }
+  app.db.prepare('INSERT INTO assessment_tracking(assessment_id,titan_at,titan_by,titan_name) VALUES(?,?,?,?)').run(old.id,stamp,'owner','Owner');
+  app.server.listen(0,'127.0.0.1');
+  await once(app.server,'listening');
+  const call=async(suffix,{actor='owner',body,csrf=true}={})=>{
+   const session=sessions[actor];
+   const response=await fetch('http://127.0.0.1:'+app.server.address().port+'/api/assessments'+suffix,{
+    method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',Cookie:'infinity_session='+session.token,
+     ...(csrf?{'X-CSRF-Token':session.csrf}:{})},body:body?JSON.stringify(body):undefined
+   });
+   return {status:response.status,data:await response.json()};
+  };
+  const exportBody={confirmResidentId:resident.id};
+  const oldExport=await call('/'+old.id+'/export',{body:exportBody});
+  assert.equal(oldExport.status,200);
+  assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,3);
+  const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
+  assert.equal(originalComparison.status,200);
+  const purge='/'+old.id+'/purge',valid={revision:1,confirmation:'effacer'};
+  assert.equal((await call(purge,{actor:'secretary',body:valid})).status,403);
+  assert.equal((await call(purge,{actor:'colleague',body:valid})).status,403);
+  assert.equal((await call(purge,{body:valid,csrf:false})).status,403);
+  assert.equal((await call(purge,{body:{...valid,confirmation:'Effacer'}})).status,400);
+  assert.equal((await call(purge,{body:{...valid,revision:2}})).status,409);
+  assert.equal((await call('/'+old.id)).status,200);
+  assert.deepEqual(await call(purge,{body:valid}),{status:200,data:{deletedId:old.id}});
+  for(const [table,column] of [['assessments','id'],['assessment_tracking','assessment_id'],['assessment_versions','assessment_id'],['assessment_documents','assessment_id'],['audit','target']]){
+   assert.equal(app.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column}=?`).get(old.id).n,0);
+  }
+  assert.equal((await call('/'+old.id)).status,404);
+  assert.equal((await call('/'+old.id+'/versions')).status,404);
+  assert.equal((await call(purge,{body:valid})).status,404);
+  assert.ok(!(await call('/trash')).data.assessments.some(entry=>entry.id===old.id));
+  assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);
+  for(const entry of [child,unrelated])assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(entry.id).data,JSON.stringify(entry));
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(unrelated.id).format_version,2);
+  assert.equal(app.db.prepare('SELECT pdf FROM assessment_documents WHERE assessment_id=?').get(child.id),undefined);
+  const refreshed=await call('/'+child.id+'/export',{body:exportBody});
+  assert.equal(refreshed.status,200);
+  assert.notEqual(refreshed.data.file,originalComparison.data.file);
+ }finally{
+  if(app.server.listening)await new Promise(resolve=>app.server.close(resolve));
+  app.close();
+  rmSync(directory,{recursive:true,force:true});
+ }
 });

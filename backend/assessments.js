@@ -4,11 +4,27 @@ import {snapshot,audit} from './database.js';
 import {emptyClinical,validateClinical,generateDiagnosis,generateProject} from '../src/assessments-domain.js';
 import {newCompactClinical} from '../src/assessments-compact.js';
 import {assessmentPDF} from './assessment-pdf.js';
+import {technicalLog} from './log.js';
+const pdfFormatVersion=3;
 export function initializeAssessments(db){db.exec(`CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,resident_id TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_tracking(assessment_id TEXT PRIMARY KEY,deleted_at TEXT,deleted_by TEXT,titan_at TEXT,titan_by TEXT,titan_name TEXT);
  CREATE TABLE IF NOT EXISTS assessment_versions(id INTEGER PRIMARY KEY,assessment_id TEXT NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_documents(assessment_id TEXT PRIMARY KEY,pdf BLOB NOT NULL,created_at TEXT NOT NULL,format_version INTEGER NOT NULL);`);}
 const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
+function purgeAssessment(db,id,actor){
+ // Cached comparisons can contain measurements from the assessment being erased.
+ db.prepare("DELETE FROM assessment_documents WHERE assessment_id=? OR assessment_id IN (SELECT id FROM assessments WHERE json_extract(data,'$.previousId')=?)").run(id,id);
+ db.prepare('DELETE FROM assessment_versions WHERE assessment_id=?').run(id);
+ db.prepare('DELETE FROM assessment_tracking WHERE assessment_id=?').run(id);
+ db.prepare("DELETE FROM audit WHERE target=? AND action LIKE 'assessment.%'").run(id);
+ const result=db.prepare('DELETE FROM assessments WHERE id=?').run(id);
+ const remaining=db.prepare(`SELECT EXISTS(SELECT 1 FROM assessments WHERE id=?) OR
+  EXISTS(SELECT 1 FROM assessment_tracking WHERE assessment_id=?) OR
+  EXISTS(SELECT 1 FROM assessment_versions WHERE assessment_id=?) OR
+  EXISTS(SELECT 1 FROM assessment_documents WHERE assessment_id=?) AS present`).get(id,id,id,id);
+ if(result.changes!==1||remaining.present)throw Error('La suppression du bilan n’a pas pu être vérifiée.');
+ audit(db,actor,'assessment.purge');
+}
 export function assessmentRoute({db,user,route,method,body,json}){
  if(!route.startsWith('/api/assessments'))return false;
  if(!['admin','kine','secretariat'].includes(user.role)){json(403,{error:'Accès aux bilans non autorisé.'});return true;}
@@ -35,11 +51,21 @@ export function assessmentRoute({db,user,route,method,body,json}){
  }
  const previous=get(id);if(!visible(previous)){db.exec('ROLLBACK');json(404,{error:'Bilan introuvable.'});return true;}
  if(action==='export'&&method==='POST'){
- if(previous.status!=='final'||previous.deletedAt)throw Error('Seuls les bilans finalisés peuvent être exportés.');if(body.confirmResidentId!==previous.residentId)throw Error('Confirmer le résident dans l’application avant export.');let pdf=db.prepare('SELECT pdf FROM assessment_documents WHERE assessment_id=? AND format_version=2').get(id)?.pdf;
- if(!pdf){const resident=residents.find(r=>r.id===previous.residentId);pdf=assessmentPDF({...previous,privacyResident:resident},previous.previousId?get(previous.previousId):null);db.prepare('INSERT INTO assessment_documents VALUES(?,?,?,2) ON CONFLICT(assessment_id) DO UPDATE SET pdf=excluded.pdf,created_at=excluded.created_at,format_version=2').run(id,pdf,now);}
+ if(previous.status!=='final'||previous.deletedAt)throw Error('Seuls les bilans finalisés peuvent être exportés.');if(body.confirmResidentId!==previous.residentId)throw Error('Confirmer le résident dans l’application avant export.');let pdf=db.prepare('SELECT pdf FROM assessment_documents WHERE assessment_id=? AND format_version=?').get(id,pdfFormatVersion)?.pdf;
+ if(!pdf){const resident=residents.find(r=>r.id===previous.residentId);pdf=assessmentPDF({...previous,privacyResident:resident},previous.previousId?get(previous.previousId):null);db.prepare('INSERT INTO assessment_documents VALUES(?,?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET pdf=excluded.pdf,created_at=excluded.created_at,format_version=excluded.format_version').run(id,pdf,now,pdfFormatVersion);}
  audit(db,user.id,'assessment.export',id);db.exec('COMMIT');json(200,{file:Buffer.from(pdf).toString('base64'),filename:`Bilan_Kinesitherapique_${previous.date}.pdf`,assessmentId:id});return true;
  }
  if(body.revision!==previous.revision){db.exec('ROLLBACK');json(409,{error:'Bilan modifié par une autre session. Rechargez avant de reprendre ; votre formulaire est conservé.'});return true;}
+ if(action==='purge'&&method==='POST'){
+  if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Suppression définitive réservée au propriétaire du bilan ou à l’administration.'});return true;}
+  if(body.confirmation!=='effacer')throw Error('Saisir exactement effacer pour confirmer la suppression.');
+  purgeAssessment(db,id,user.id);
+  db.exec('COMMIT');
+  try{if(db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get().busy)technicalLog('checkpoint.deferred');}
+  catch{technicalLog('checkpoint.deferred');}
+  json(200,{deletedId:id});
+  return true;
+ }
  if(['trash','restore','titan'].includes(action)&&method==='POST'){
  if(action==='titan'){if(previous.status!=='final'||previous.deletedAt||body.confirmation!=='SAISI SUR TITAN')throw Error('Confirmation manuelle d’un bilan finalisé requise.');if(previous.titanConfirmedAt)throw Error('Ce bilan est déjà confirmé dans Titan.');db.prepare('INSERT INTO assessment_tracking(assessment_id,titan_at,titan_by,titan_name) VALUES(?,?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET titan_at=excluded.titan_at,titan_by=excluded.titan_by,titan_name=excluded.titan_name').run(id,now,user.id,user.name);}
  else {if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Action réservée au propriétaire du brouillon ou à l’administratrice.'});return true;}if(previous.status!=='draft')throw Error('Un bilan finalisé ne peut pas être supprimé par cette action.');if(action==='trash'){if(previous.deletedAt||body.confirmation!=='SUPPRIMER LE BROUILLON')throw Error('Confirmation de suppression requise.');db.prepare('INSERT INTO assessment_tracking(assessment_id,deleted_at,deleted_by) VALUES(?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by').run(id,now,user.id);}else{if(!previous.deletedAt||body.confirmation!=='RESTAURER')throw Error('Confirmation de restauration requise.');db.prepare('UPDATE assessment_tracking SET deleted_at=NULL,deleted_by=NULL WHERE assessment_id=?').run(id);}}
