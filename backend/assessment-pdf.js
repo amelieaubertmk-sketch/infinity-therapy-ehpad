@@ -1,6 +1,6 @@
 import {walkingFields,anamnesisFields,jointFields,testDefinitions,testResult,tinettiScores,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,findingOptions,effectiveAids,effectiveTug,compactTinetti,reviewLabel,
- recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
+import {muscleRows,findingOptions,effectiveAids,effectiveTug,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
+ recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 
 const pageWidth=595.28,pageHeight=841.89,margin=46,width=pageWidth-2*margin,top=745,bottom=51;
@@ -109,7 +109,7 @@ function documentLayout(record,clean){
   };
  }
  function table(headers,rows,ratios=[0.34,0.66],showHeader=true){
-  const cellSize=9.7,cellLeading=12.5,headerHeight=19,rowPadding=5.5,after=6;
+  const cellSize=9.7,cellLeading=12.5,headerHeight=19,rowPadding=5,after=6;
   const widths=ratios.map(ratio=>width*ratio);
   const positions=widths.map((_,i)=>margin+widths.slice(0,i).reduce((total,v)=>total+v,0)+9);
   const cells=rows.filter(row=>row.slice(1).some(value=>clean(value).trim())).map(row=>
@@ -206,27 +206,35 @@ function compactSections(c,{section,paragraph,table}){
   ['Périmètre',c.walk.possible==='Possible'&&c.walk.distance!==''?c.walk.distance+' m':''],
   ['Fauteuil roulant habituel',c.walk.wheelchair]
  ];
- const tinetti=[];
- if(c.tinetti.status==='Non réalisable')tinetti.push(['Résultat','Non réalisable'+(c.tinetti.reason?' — '+c.tinetti.reason:'')]);
- else if(c.tinetti.status==='Réalisé'){
-  const scores=compactTinetti(c);
-  for(const [key,label,max] of [['balance','Équilibre',16],['gait','Marche',12],['total','Total',28]])if(scores[key]!==null)tinetti.push([label,scores[key]+'/'+max]);
-  tinetti.push(['Interprétation',scores.interpretation]);
-  const aids=effectiveAids(c,c.tinetti);
-  if(aids.length)tinetti.push(['Aides utilisées',aids.join(', ')]);
+ const tinetti=[],test=c.tinetti,status=tinettiStatus(test),scores=compactTinetti(c);
+ if(status==='Impossible')tinetti.push(['Résultat',test.reason?'Impossible — '+test.reason:'Impossible']);
+ if(status==='Non réalisé')tinetti.push(['Résultat',status]);
+ if(status==='Réalisé'){
+  for(const [key,label,max] of tinettiGroups){
+   const points=scores.groups[key].points;
+   if(points!==null)tinetti.push([scores.groups[key].complete?label:label+' (provisoire)',points+'/'+max]);
+  }
+  if(scores.provisionalTotal!==null)tinetti.push([scores.partial?'Total provisoire':'Total',scores.provisionalTotal+'/28']);
+  if(scores.partial)tinetti.push(['Évaluation',tinettiIncomplete]);
  }
+ if(scores.interpretation)tinetti.push(['Interprétation',scores.interpretation]);
+ if(scores.description)tinetti.push(['Description clinique',scores.description+'\n'+tinettiContext]);
+ for(const [key,label] of tinettiFields)tinetti.push([label,test.details?.[key]]);
+ if(test.details?.humanAssistance==='Aide physique')tinetti.push(['Précaution',tinettiAssistanceWarning]);
+ if(!test.details&&status==='Réalisé'&&test.aidsOverride)tinetti.push(['Aides utilisées',effectiveAids(c,test).join(', ')]);
+ tinetti.push(['Observations complémentaires',test.details?.notes]);
  const tug=effectiveTug(c),tugRows=[];
  if(tug.status==='Réalisé'){
   if(tug.time)tugRows.push(['Temps',tug.time+' secondes']);
-  if(tug.details&&tugRisk(tug))tugRows.push(['Interprétation',tugRisk(tug)+'. '+tugContext+' '+tugVigilance]);
+  if(tugRisk(tug))tugRows.push(['Interprétation',tugRisk(tug)+'. '+tugContext+' '+tugVigilance]);
   if(!tug.details){
    tugRows.push(['Aides utilisées',effectiveAids(c,tug).join(', ')]);
-   if(tug.protocol==='Adapté')tugRows.push(['Précaution','Passation adaptée — résultat descriptif.']);
+   if(tug.protocol==='Adapté')tugRows.push(['Précaution',tugLegacyAdaptation]);
   }
   if(tug.details?.humanAssistance==='Aide physique')tugRows.push(['Précaution',tugPhysicalAssistance]);
  }else if(tug.status==='Non réalisable'){
   tugRows.push(['Résultat',tug.reason?'Non réalisable — '+tug.reason:'Test impossible']);
-  if(tug.details)tugRows.push(['Interprétation',tugRisk(tug)]);
+  tugRows.push(['Interprétation',tugRisk(tug)]);
  }
  if(tug.status)tugRows.push(...recordedTugDetails(tug));
 
@@ -272,22 +280,29 @@ function historicalSections(c,{section,paragraph,table}){
   ['Five Times Sit-to-Stand (5xSTS)',testDefinitions.filter(def=>def.id==='fiveChair')],
   ['Autres observations fonctionnelles',testDefinitions.filter(def=>!def.label.startsWith('MRC')&&!['walk','tinetti','tug','fiveChair'].includes(def.id))]
  ];
- const tests=groups.map(([label,definitions])=>section(label,[table(['Élément','Résultat'],definitions.filter(def=>c.tests[def.id].status==='Réalisé').flatMap(def=>{
+ const tests=groups.map(([label,definitions])=>section(label,[table(['Élément','Résultat'],definitions.filter(def=>c.tests[def.id].status==='Réalisé'||['tug','tinetti'].includes(def.id)&&['Non réalisable','Contre-indiqué'].includes(c.tests[def.id].status)).flatMap(def=>{
   const result=c.tests[def.id];
   const includeConditions=!['tinetti','tug','fiveChair'].includes(def.id);
   const details=includeConditions&&result.conditions?' — '+result.conditions:'';
-  if(def.id==='tinetti'&&result.status==='Réalisé'){
-   const {balance,gait,total}=tinettiScores(result);
-   const rows=[['Équilibre',balance+'/16'],['Marche',gait+'/12'],['Total',total+'/28']];
+  if(def.id==='tinetti'){
+   if(result.status!=='Réalisé')return [['Résultat',testResult(def,result)],['Interprétation',tinettiNotEvaluable]];
+   const {balance,gait,total}=tinettiScores(result),risk=tinettiRisk(total);
+   const rows=[['Équilibre',balance+'/16'],['Marche',gait+'/12'],['Total',total+'/28'],
+    ['Interprétation',risk.interpretation],['Description clinique',risk.description],['Repère clinique',tinettiContext]];
    for(const [id,item,max] of [...balanceItems,...gaitItems])rows.push([item,result.items[id]+'/'+max]);
    return rows;
+  }
+  if(def.id==='tug'){
+   if(result.status!=='Réalisé')return [['Résultat',testResult(def,result)],['Interprétation',tugRisk({status:'Non réalisable'})]];
+   const risk=tugRisk({status:result.status,time:result.value});
+   return [['Temps',result.value+' secondes'],['Interprétation',risk?risk+'. '+tugContext:'']];
   }
   return [[def.label,testResult(def,result)+details]];
  }),undefined,false)]));
  const unperformed=new Map();
  for(const def of testDefinitions){
   const test=c.tests[def.id];
-  if(test.status==='Réalisé')continue;
+  if(test.status==='Réalisé'||['tug','tinetti'].includes(def.id)&&['Non réalisable','Contre-indiqué'].includes(test.status))continue;
   const result=testResult(def,test);
   const details=!['tinetti','tug','fiveChair'].includes(def.id)&&test.conditions?' — '+test.conditions:'';
   const label=result+details;

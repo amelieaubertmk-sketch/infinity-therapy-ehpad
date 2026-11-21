@@ -21,7 +21,7 @@ test('compact defaults, MRC 0/NE/missing, partial results and conditional fields
  assert.deepEqual(muscleRows.map(r=>r[0]),['pull','push','grip','hip','kneeFlex','kneeExt','ankleDorsi','anklePlantar']);
 });
 test('walking dependencies, actual aids, guided Tinetti 16+12, NE and protocol-sensitive comparisons',()=>{
- const c=complete();c.walk.aidEnabled=true;c.walk.aids=['Aide humaine','Déambulateur 2 roues'];assert.deepEqual(effectiveAids(c,c.tug),c.walk.aids);c.tug.aidsOverride=true;c.tug.aids=['Canne simple'];assert.deepEqual(effectiveAids(c,c.tug),['Canne simple']);c.tinetti.status='Réalisé';c.tinetti.protocol='Standard';for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);assert.deepEqual(Object.fromEntries(['balance','gait','total'].map(k=>[k,compactTinetti(c)[k]])),{balance:16,gait:12,total:28});assert.match(compactTinetti(c).interpretation,/faible/);for(const [target,label] of [[18,'élevé'],[19,'intermédiaire'],[24,'intermédiaire'],[25,'faible'],[28,'faible']]){let remaining=target;for(const [id,,,values] of pomaItems){const points=Math.min(values.length-1,remaining);c.tinetti.items[id]=String(points);remaining-=points;}assert.equal(compactTinetti(c).total,target);assert.ok(compactTinetti(c).interpretation.includes(label));}c.tinetti.items.sitting='NE';assert.equal(compactTinetti(c).total,null);assert.equal(compactTinetti(c).balance,null);assert.match(compactTinetti(c).interpretation,/pas de total/);c.tinetti.items.sitting='0';assert.equal(compactTinetti(c).total,27);c.walk.possible='Impossible';c.tug.status='Réalisé';c.tug.time='50';assert.equal(effectiveTug(c).status,'Non réalisable');assert.equal(effectiveTug(c).time,'');assert.equal(compactTinetti(c).gait,null);assert.equal(compactTinetti(c).total,null);assert.ok(!compactProject(c).includes('Entretenir la marche'));assert.match(compactProject(c),/marche est notée impossible/);
+ const c=complete();c.walk.aidEnabled=true;c.walk.aids=['Aide humaine','Déambulateur 2 roues'];assert.deepEqual(effectiveAids(c,c.tug),c.walk.aids);c.tug.aidsOverride=true;c.tug.aids=['Canne simple'];assert.deepEqual(effectiveAids(c,c.tug),['Canne simple']);c.tinetti.status='Réalisé';c.tinetti.protocol='Standard';for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);assert.deepEqual(Object.fromEntries(['balance','gait','total'].map(k=>[k,compactTinetti(c)[k]])),{balance:16,gait:12,total:28});assert.match(compactTinetti(c).interpretation,/faible/);for(const [target,label] of [[18,'élevé'],[19,'modéré'],[24,'modéré'],[25,'faible'],[28,'faible']]){let remaining=target;for(const [id,,,values] of pomaItems){const points=Math.min(values.length-1,remaining);c.tinetti.items[id]=String(points);remaining-=points;}assert.equal(compactTinetti(c).total,target);assert.ok(compactTinetti(c).interpretation.includes(label));}c.tinetti.items.sitting='NE';assert.equal(compactTinetti(c).total,null);assert.equal(compactTinetti(c).balance,null);assert.match(compactTinetti(c).interpretation,/non évaluable/);c.tinetti.items.sitting='0';assert.equal(compactTinetti(c).total,27);c.walk.possible='Impossible';c.tug.status='Réalisé';c.tug.time='50';assert.equal(effectiveTug(c).status,'Non réalisable');assert.equal(effectiveTug(c).time,'');assert.equal(compactTinetti(c).gait,null);assert.equal(compactTinetti(c).total,null);assert.ok(!compactProject(c).includes('Entretenir la marche'));assert.match(compactProject(c),/marche est notée impossible/);
  const before=complete(),after=complete();for(const x of [before,after]){delete x.tug.details;x.tug.status='Réalisé';x.tug.protocol='Standard';x.tug.time='20';}after.tug.time='18';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/-2/);after.tug.protocol='Adapté';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/comparaison chiffrée non appliquée/);
 });
 test('TUG thresholds, explicit selections, invalid durations and impossible status',()=>{
@@ -50,7 +50,7 @@ test('TUG thresholds, explicit selections, invalid durations and impossible stat
  assert.throws(()=>validateCompact(c),/Aucun temps/);
  tug.time='';
  validateCompact(c,true);
- assert.equal(tugRisk(tug),'Risque de chute non évaluable par le TUG');
+ assert.equal(tugRisk(tug),'Risque non évaluable par le TUG');
  assert.deepEqual(tug.details.observations,['Petits pas','Instabilité']);
 });
 test('TUG PDF omits blank fields, retains observations when impossible and reads older compact bilans',t=>{
@@ -68,7 +68,7 @@ test('TUG PDF omits blank fields, retains observations when impossible and reads
  tug.details.observations=['Hésitation'];
  const impossible=extract();
  if(impossible===null){t.skip('pdftotext indisponible');return;}
- assert.match(impossible,/Risque de chute non évaluable par le TUG/);
+ assert.match(impossible,/Risque non évaluable par le TUG/);
  assert.match(impossible,/Aide technique Aucune/);
  assert.match(impossible,/Observations Hésitation/);
  assert.doesNotMatch(impossible,/Temps|Assistance humaine|Transfert assis-debout|Observations complémentaires|Instabilité/);
@@ -153,7 +153,6 @@ test('clinical synthesis links objectives to evidence and defers conflicting fin
  assert.match(compactDiagnosis(c),/assistance physique/);
  assert.doesNotMatch(compactProject(c),/exercices de lever de chaise/);
  c.tinetti.status='Réalisé';
- c.tinetti.protocol='Standard';
  for(const [id] of pomaItems)c.tinetti.items[id]='0';
  c.tug.status='Réalisé';
  c.tug.time='24';
@@ -296,7 +295,7 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   const oldExport=await call('/'+old.id+'/export',{body:exportBody});
   assert.equal(oldExport.status,200);
   assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
-  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,3);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,4);
   const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
   assert.equal(originalComparison.status,200);
   const purge='/'+old.id+'/purge',valid={revision:1,confirmation:'effacer'};
@@ -326,4 +325,44 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   app.close();
   rmSync(directory,{recursive:true,force:true});
  }
+});
+
+test('a partial Tinetti retains real points without reporting a final score in the PDF',t=>{
+ const c=complete();
+ Object.assign(c.tinetti,{status:'Réalisé',protocol:'',conditions:'Ancienne rubrique à masquer'});
+ c.tinetti.items.sitting='1';
+ c.tinetti.items.arising='0';
+ c.tinetti.items.start='NE';
+ const scores=compactTinetti(c);
+ assert.deepEqual(scores.groups.balance,{points:1,entered:2,count:10,nonEvaluable:0,blocked:false,complete:false});
+ assert.deepEqual(scores.groups.gait,{points:null,entered:1,count:10,nonEvaluable:1,blocked:false,complete:false});
+ assert.equal(scores.provisionalTotal,1);
+ assert.equal(scores.total,null);
+ assert.equal(scores.level,'unavailable');
+ assert.doesNotThrow(()=>validateCompact(c,true),'Un Tinetti partiel peut être finalisé tel quel sans protocole.');
+ Object.assign(c.tinetti.details,{technicalAid:'Deux cannes',humanAssistance:'Aide physique',notes:'Interruption fictive.'});
+ const record={date:'2026-11-12',type:'initial',practitioner:'Amélie',clinical:c,diagnosis:'Bilan fictif.',project:'Objectif fictif.'};
+ const pdf=spawnSync('pdftotext',['-','-'],{input:assessmentPDF(record),encoding:'utf8'});
+ if(pdf.error?.code==='ENOENT'){t.skip('pdftotext indisponible');return;}
+ assert.equal(pdf.status,0,pdf.stderr);
+ const tinetti=pdf.stdout.split('2.3 — Tinetti POMA 28')[1].split('2.4 — Timed Up')[0].replace(/\s+/g,' ');
+ assert.match(tinetti,/Équilibre \(provisoire\) 1\/16/);
+ assert.match(tinetti,/Total provisoire 1\/28/);
+ assert.match(tinetti,/évaluation incomplète/);
+ assert.match(tinetti,/Risque non évaluable par le Tinetti/);
+ assert.match(tinetti,/Interruption fictive/);
+ assert.doesNotMatch(tinetti,/Marche \(provisoire\) 0\/12|Risque de chute|Ancienne rubrique/);
+ c.tinetti.status='Impossible';
+ const unavailable=compactTinetti(c);
+ assert.equal(unavailable.provisionalTotal,null);
+ assert.equal(unavailable.level,'unavailable');
+ assert.equal(c.tinetti.items.sitting,'1');
+ assert.equal(c.tinetti.details.notes,'Interruption fictive.');
+ const historical=structuredClone(c);
+ delete historical.tinetti.details;
+ Object.assign(historical.tinetti,{status:'Non réalisable',protocol:'Adapté',conditions:'Ancienne rubrique'});
+ const before=structuredClone(historical);
+ assert.equal(compactTinetti(historical).level,'unavailable');
+ validateCompact(historical,true);
+ assert.deepEqual(historical,before);
 });

@@ -23,8 +23,17 @@ try{
  const tug=page.getByRole('region',{name:'Saisie du Timed Up and Go'});
  const tugTime=tug.getByLabel('Temps (secondes)'),tugImpossible=tug.getByLabel('Test impossible');
  const tugAid=tug.getByLabel('Aide technique'),tugAssistance=tug.getByLabel('Assistance humaine'),tugTransfer=tug.getByLabel('Transfert assis-debout');
- const tugNotes=tug.getByLabel('Observations complémentaires');
- const observation=(scope,name)=>scope.getByRole('button',{name,exact:true});
+ const tugNotes=tug.getByLabel('Texte libre (facultatif)');
+ const observation=(scope,name)=>scope.getByRole('checkbox',{name,exact:true});
+ const risk=async(scope,label,color)=>{
+  const tag=scope.locator('.clinical-risk');
+  assert.equal(await tag.innerText(),label);
+  assert.equal(await tag.evaluate(element=>getComputedStyle(element).color),color);
+ };
+ const colors={low:'rgb(22, 101, 52)',moderate:'rgb(152, 67, 0)',high:'rgb(161, 27, 35)',veryHigh:'rgb(114, 21, 42)',unavailable:'rgb(68, 80, 94)'};
+ assert.equal(await tug.getByRole('group',{name:'Observations complémentaires'}).count(),1);
+ assert.equal(await tug.getByRole('button',{name:/Instabilité|Petits pas/}).count(),0);
+ assert.doesNotMatch(await tug.innerText(),/Aide proposée|Modifier les aides|Conditions de passation|Protocole/);
  for(const select of [tugAid,tugAssistance,tugTransfer]){
   assert.equal(await select.inputValue(),'');
   assert.equal(await select.locator('option:checked').innerText(),'Sélectionner');
@@ -32,6 +41,10 @@ try{
  const desktopBoxes=await Promise.all([tugAid,tugAssistance,tugTransfer].map(select=>select.boundingBox()));
  assert.ok(desktopBoxes.every(box=>box.y===desktopBoxes[0].y));
  assert.ok(desktopBoxes[0].x<desktopBoxes[1].x&&desktopBoxes[1].x<desktopBoxes[2].x);
+ for(const [time,level,label] of [['11','low','faible'],['15','moderate','modéré'],['24','high','élevé'],['35','veryHigh','très élevé']]){
+  await tugTime.fill(time);
+  await risk(tug,'Risque de chute '+label,colors[level]);
+ }
  await tugTime.fill('20,5');
  assert.match(await tug.getByRole('status').innerText(),/Risque de chute élevé/);
  assert.match(await tug.getByRole('status').innerText(),/Interprétation indicative/);
@@ -40,26 +53,112 @@ try{
  assert.ok(await tug.getByText('Résultat chronométrique', {exact:false}).isVisible());
  await tugAssistance.selectOption('');
  assert.ok(!(await tug.getByText('Résultat chronométrique', {exact:false}).isVisible()));
+ await tugAssistance.selectOption('Simple surveillance');
  await tugTransfer.selectOption('Avec utilisation des accoudoirs');
- await observation(tug,'Instabilité').click();
- await observation(tug,'Difficulté au demi-tour').click();
- assert.equal(await tug.locator('[aria-pressed="true"]').count(),2);
- await observation(tug,'Instabilité').click();
- assert.equal(await observation(tug,'Instabilité').getAttribute('aria-pressed'),'false');
- assert.equal(await observation(tug,'Difficulté au demi-tour').getAttribute('aria-pressed'),'true');
+ const tugMenu=tug.locator('summary');
+ assert.equal(await observation(tug,'Instabilité').isVisible(),false);
+ await tugMenu.click();
+ await observation(tug,'Instabilité').check();
+ await observation(tug,'Difficulté au demi-tour').check();
+ await observation(tug,'Petits pas').check();
+ await observation(tug,'Instabilité').uncheck();
+ assert.equal(await tug.locator('[data-tug-observation]:checked').count(),2);
+ await tugMenu.click();
+ assert.match(await tugMenu.innerText(),/Difficulté au demi-tour, Petits pas/);
  await tugNotes.fill('Ralentissement fictif au demi-tour.');
  await tugImpossible.check();
  assert.ok(await tugTime.isDisabled());
  assert.equal(await tugTime.inputValue(),'');
- assert.match(await tug.getByRole('status').innerText(),/non évaluable par le TUG/);
+ await risk(tug,'Risque non évaluable par le TUG',colors.unavailable);
  const impossibleDraft=await write('',()=>page.locator('#assessment-save').click());
  assert.equal(impossibleDraft.clinical.tug.time,'');
  assert.equal(impossibleDraft.clinical.tug.status,'Non réalisable');
- assert.deepEqual(impossibleDraft.clinical.tug.details.observations,['Difficulté au demi-tour']);
+ assert.deepEqual(impossibleDraft.clinical.tug.details.observations,['Difficulté au demi-tour','Petits pas']);
  await tugImpossible.uncheck();
  await tugTime.fill('20,5');
- await field('clinical.tinetti.status').selectOption('Réalisé');await field('clinical.tinetti.protocol').selectOption('Standard');for(const [id,,,values] of pomaItems)await field('clinical.tinetti.items.'+id).selectOption(String(values.length-1));assert.match(await page.locator('#assessment-tinetti-score').innerText(),/28\/28/);await field('clinical.tinetti.items.sitting').selectOption('NE');assert.match(await page.locator('#assessment-tinetti-score').innerText(),/non calculé/);await field('clinical.tinetti.items.sitting').selectOption('0');assert.match(await page.locator('#assessment-tinetti-score').innerText(),/27\/28/);
- await field('clinical.walk.possible').selectOption('Impossible');assert.ok(await tugTime.isDisabled());assert.equal(await tugTime.inputValue(),'');assert.ok(await field('clinical.tinetti.items.start').isDisabled());assert.match(await page.locator('#assessment-tinetti-score').innerText(),/non calculé/);await field('clinical.walk.possible').selectOption('Possible');assert.equal(await tugTime.inputValue(),'20,5');assert.match(await page.locator('#assessment-tinetti-score').innerText(),/27\/28/);
+ const tinetti=page.getByRole('region',{name:'Saisie du Tinetti'});
+ const tinettiStatus=field('clinical.tinetti.status'),tinettiAid=tinetti.getByLabel('Aide technique utilisée');
+ const tinettiAssistance=tinetti.getByLabel('Assistance humaine'),tinettiNotes=tinetti.getByLabel('Observations complémentaires');
+ const balance=tinetti.locator('[data-tinetti-group="balance"]'),gait=tinetti.locator('[data-tinetti-group="gait"]');
+ const total=tinetti.getByRole('status'),item=id=>field('clinical.tinetti.items.'+id);
+ const totalPattern=score=>new RegExp(score+' / 28');
+ assert.equal(await tinettiAid.inputValue(),'');
+ assert.equal(await tinettiAssistance.inputValue(),'');
+ await tinettiStatus.selectOption('Réalisé');
+ assert.doesNotMatch(await tinetti.innerText(),/Protocole|Standard \/ Adapté|Aide proposée|Modifier les aides|Conditions de passation/);
+ assert.equal(await field('clinical.tinetti.protocol').count(),0);
+ assert.equal(await field('clinical.tinetti.conditions').count(),0);
+ assert.equal(await field('clinical.tinetti.aidsOverride').count(),0);
+ assert.equal(await item('sitting').inputValue(),'');
+ assert.match(await item('path').locator('option[value="1"]').innerText(),/Déviation modérée ou aide technique/);
+ assert.match(await item('arising').locator('option[value="0"]').innerText(),/Incapable sans aide$/);
+ const desktopGrid=await tinetti.locator('.tinetti-grid').first().evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(' ').length);
+ assert.equal(desktopGrid,4);
+ const desktopItems=await Promise.all(pomaItems.slice(0,4).map(([id])=>item(id).boundingBox()));
+ assert.ok(desktopItems.every(box=>box.height===44&&Math.abs(box.y-desktopItems[0].y)<1));
+ await item('sitting').selectOption('1');
+ assert.match(await balance.innerText(),/ÉQUILIBRE : 1 \/ 16.*1\/10 items renseignés/);
+ await item('arising').selectOption('2');
+ assert.match(await balance.innerText(),/ÉQUILIBRE : 3 \/ 16.*2\/10 items renseignés/);
+ await item('arising').selectOption('1');
+ assert.match(await balance.innerText(),/ÉQUILIBRE : 2 \/ 16/);
+ await item('start').selectOption('1');
+ assert.match(await gait.innerText(),/MARCHE : 1 \/ 12.*1\/10 items renseignés/);
+ assert.match(await total.innerText(),totalPattern(3));
+ assert.match(await total.innerText(),/Score provisoire — évaluation incomplète/);
+ assert.equal(await tinetti.locator('.clinical-risk').count(),0);
+ await item('sitting').selectOption('NE');
+ assert.match(await balance.innerText(),/1 NE/);
+ await risk(tinetti,'Risque non évaluable par le Tinetti',colors.unavailable);
+ assert.match(await total.innerText(),totalPattern(2));
+ const setScore=async target=>{
+  let remaining=target;
+  for(const [id,,,values] of pomaItems){
+   const points=Math.min(remaining,values.length-1);
+   await item(id).selectOption(String(points));
+   remaining-=points;
+  }
+ };
+ for(const [score,level,label,description] of [
+  [18,'high','élevé','Troubles importants de l’équilibre ou de la marche.'],
+  [19,'moderate','modéré','Troubles de l’équilibre ou de la marche.'],
+  [24,'moderate','modéré','Troubles de l’équilibre ou de la marche.'],
+  [25,'low','faible','Bon équilibre et bonne qualité de la marche.'],
+  [27,'low','faible','Bon équilibre et bonne qualité de la marche.']
+ ]){
+  await setScore(score);
+  assert.match(await total.innerText(),totalPattern(score));
+  assert.ok((await total.innerText()).includes(description));
+  assert.doesNotMatch(await total.innerText(),/Score provisoire/);
+  await risk(tinetti,'Risque de chute '+label,colors[level]);
+ }
+ await item('sitting').selectOption('');
+ assert.match(await total.innerText(),/Score provisoire/);
+ assert.equal(await tinetti.locator('.clinical-risk').count(),0);
+ await item('sitting').selectOption('1');
+ await tinettiAid.selectOption('Deux cannes');
+ await tinettiAssistance.selectOption('Aide physique');
+ assert.ok(await tinetti.getByText('L’aide physique peut limiter', {exact:false}).isVisible());
+ await tinettiNotes.fill('Un rappel de consigne a été nécessaire.');
+ await tinettiStatus.selectOption('Impossible');
+ assert.equal(await item('sitting').count(),0);
+ await risk(tinetti,'Risque non évaluable par le Tinetti',colors.unavailable);
+ assert.equal(await tinettiNotes.inputValue(),'Un rappel de consigne a été nécessaire.');
+ const blockedDraft=await write('',()=>page.locator('#assessment-save').click());
+ assert.equal(blockedDraft.clinical.tinetti.status,'Impossible');
+ assert.equal(blockedDraft.clinical.tinetti.items.sitting,'1');
+ assert.ok(!Object.hasOwn(blockedDraft.clinical.tinetti,'total'));
+ await tinettiStatus.selectOption('Réalisé');
+ assert.match(await total.innerText(),totalPattern(27));
+ await field('clinical.walk.possible').selectOption('Impossible');
+ assert.ok(await tugTime.isDisabled());
+ assert.equal(await tugTime.inputValue(),'');
+ assert.ok(await item('start').isDisabled());
+ assert.match(await total.innerText(),/Score provisoire/);
+ await risk(tinetti,'Risque non évaluable par le Tinetti',colors.unavailable);
+ await field('clinical.walk.possible').selectOption('Possible');
+ assert.equal(await tugTime.inputValue(),'20,5');
+ assert.match(await total.innerText(),totalPattern(27));
  const chair=page.getByRole('region',{name:'Saisie du 5xSTS'});
  const chairTime=field('clinical.chair.time'),chairStatus=field('clinical.chair.status'),chairArms=field('clinical.chair.arms');
  const chairAssistance=field('clinical.chair.humanAssistance'),chairNotes=field('clinical.chair.notes');
@@ -106,20 +205,32 @@ try{
  assert.equal(await tugTime.inputValue(),'20,5');
  assert.match(await tug.getByRole('status').innerText(),/Risque de chute élevé/);
  assert.equal(await tugAid.inputValue(),'Canne simple');
- assert.equal(await tugAssistance.inputValue(),'');
+ assert.equal(await tugAssistance.inputValue(),'Simple surveillance');
  assert.equal(await tugTransfer.inputValue(),'Avec utilisation des accoudoirs');
  assert.equal(await tugNotes.inputValue(),'Ralentissement fictif au demi-tour.');
- assert.equal(await observation(tug,'Difficulté au demi-tour').getAttribute('aria-pressed'),'true');
- assert.equal(await observation(tug,'Instabilité').getAttribute('aria-pressed'),'false');
+ assert.match(await tugMenu.innerText(),/Difficulté au demi-tour, Petits pas/);
+ await tugMenu.click();
+ assert.ok(await observation(tug,'Difficulté au demi-tour').isChecked());
+ assert.ok(await observation(tug,'Petits pas').isChecked());
+ assert.ok(!(await observation(tug,'Instabilité').isChecked()));
+ assert.match(await balance.innerText(),/16 \/ 16/);
+ assert.match(await gait.innerText(),/11 \/ 12/);
+ assert.match(await total.innerText(),totalPattern(27));
+ assert.equal(await tinettiAid.inputValue(),'Deux cannes');
+ assert.equal(await tinettiAssistance.inputValue(),'Aide physique');
+ assert.equal(await tinettiNotes.inputValue(),'Un rappel de consigne a été nécessaire.');
  assert.equal(await field('clinical.observations').count(),0);assert.equal(await field('clinical.joints').count(),0);assert.equal(await field('reviewWindow').inputValue(),'3m');await field('reviewWindow').selectOption('clinical');await page.locator('#assessment-reviewed').check();await write('/finalize',()=>page.locator('#assessment-finalize').click());assert.equal(await page.locator('#assessment-trash').count(),0);assert.equal(await page.locator('#assessment-save').count(),0);
  await page.locator('[data-assessment-view="pending"]').click();const row=page.locator(`[data-assessment-row="${initial.id}"]`);await row.getByRole('button',{name:'Voir le PDF',exact:true}).click();assert.match(await page.locator('#modal').innerText(),/CODE-SECRET-PATIENT/);assert.ok(await page.locator('#assessment-download').isDisabled());await page.locator('#assessment-confirm-resident').check();const download=page.waitForEvent('download');await page.locator('#assessment-download').click();const pdf=await download;assert.equal(pdf.suggestedFilename(),'Bilan_Kinesitherapique_2026-11-12.pdf');const file=path.join(directory,'download.pdf');await pdf.saveAs(file);const extracted=spawnSync('pdftotext',[file,'-'],{encoding:'utf8'});assert.equal(extracted.status,0);for(const token of ['CODE-SECRET-PATIENT',initial.residentId,initial.id,'OBSERVATION_OPTIONNELLE_MASQUEE','ARTICULAIRE_OPTIONNEL_MASQUE','Premier étage'])assert.ok(!extracted.stdout.includes(token));const tugPDF=extracted.stdout.split('2.4 — Timed Up and Go (TUG)')[1].split('2.5 — Five Times')[0].replace(/\s+/g,' ');
- for(const line of ['Temps 20,5 secondes','Interprétation Risque de chute élevé','Aide technique Canne simple','Transfert assis-debout Avec utilisation des accoudoirs','Observations Difficulté au demi-tour','Observations complémentaires Ralentissement fictif au demi-tour.'])assert.ok(tugPDF.includes(line),line);
+ for(const line of ['Temps 20,5 secondes','Interprétation Risque de chute élevé','Aide technique Canne simple','Assistance humaine Simple surveillance','Transfert assis-debout Avec utilisation des accoudoirs','Observations Difficulté au demi-tour, Petits pas','Observations complémentaires Ralentissement fictif au demi-tour.'])assert.ok(tugPDF.includes(line),line);
  const chairPDF=extracted.stdout.split('2.5 — Five Times Sit-to-Stand (5xSTS)')[1].split('2.7 — Transferts')[0].replace(/\s+/g,' ');
  for(const phrase of ['Temps 15,01 secondes','Performance nettement ralentie','Sans utilisation des bras','Simple surveillance','Fatigabilité fictive au dernier lever.'])assert.ok(chairPDF.includes(phrase),phrase);
  assert.doesNotMatch(chairPDF,/Protocole|Conditions de passation|risque de chute/);
  assert.ok(extracted.stdout.replace(/\s+/g,' ').includes(manual));
  assert.ok(extracted.stdout.includes(manualProject));
- assert.doesNotMatch(tugPDF,/Assistance humaine|Instabilité|Petits pas|Hésitation|Aides utilisées|Protocole/);
+ assert.doesNotMatch(tugPDF,/Instabilité|Hésitation|Aides utilisées|Protocole|Conditions de passation/);
+ const tinettiPDF=extracted.stdout.split('2.3 — Tinetti POMA 28')[1].split('2.4 — Timed Up')[0].replace(/\s+/g,' ');
+ for(const phrase of ['Équilibre 16/16','Marche 11/12','Total 27/28','Risque de chute faible','Bon équilibre et bonne qualité de la marche.','Aide technique utilisée Deux cannes','Assistance humaine Aide physique','Un rappel de consigne a été nécessaire.'])assert.ok(tinettiPDF.includes(phrase),phrase);
+ assert.doesNotMatch(tinettiPDF,/Protocole|Conditions de passation|Aides proposées|Score provisoire/);
  assert.match(extracted.stdout,/NE/);assert.match(extracted.stdout,/27\/28/);assert.ok(!extracted.stdout.includes('Rotation à 360°'));await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();assert.ok(await row.isVisible());accept=false;await row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click();assert.ok(await row.isVisible());accept=true;await write('/titan',()=>row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click());assert.equal(await page.locator(`[data-assessment-row="${initial.id}"]`).count(),0);await page.locator('[data-assessment-view="history"]').click();assert.match(await page.locator(`[data-assessment-row="${initial.id}"]`).innerText(),/Saisi sur Titan/);
  const abandoned=await create('2026-11-13');await field('clinical.reason').fill('Brouillon abandonné, données fictives');await write('',()=>page.locator('#assessment-save').click());accept=false;await page.locator('#assessment-trash').click();assert.ok(await page.locator('#assessment-trash').isVisible());accept=true;await write('/trash',()=>page.locator('#assessment-trash').click());assert.equal(await page.locator(`[data-assessment-row="${abandoned.id}"]`).count(),0);await page.locator('[data-assessment-view="trash"]').click();await write('/restore',()=>page.locator(`[data-assessment-row="${abandoned.id}"]`).getByRole('button',{name:'Restaurer le brouillon',exact:true}).click());await page.locator('[data-assessment-view="active"]').click();await page.locator(`[data-assessment-row="${abandoned.id}"] [data-assessment-action="open"]`).click();assert.equal(await field('clinical.reason').inputValue(),'Brouillon abandonné, données fictives');
  await page.setViewportSize(devices['iPhone 13'].viewport);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/infinity-2.6.0-compact-iphone.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});
@@ -142,13 +253,21 @@ try{
  await mobileTime.fill('12');
  assert.match(await mobileTug.getByRole('status').innerText(),/Risque de chute modéré/);
  await mobileTug.getByLabel('Assistance humaine').selectOption('Simple surveillance');
+ await mobileTug.locator('summary').tap();
  const smallSteps=observation(mobileTug,'Petits pas'),hesitation=observation(mobileTug,'Hésitation');
- assert.ok((await smallSteps.boundingBox()).height>=44);
+ assert.ok((await smallSteps.locator('..').boundingBox()).height>=44);
  await smallSteps.tap();
  await hesitation.tap();
  await smallSteps.tap();
- assert.equal(await smallSteps.getAttribute('aria-pressed'),'false');
- assert.equal(await hesitation.getAttribute('aria-pressed'),'true');
+ assert.ok(!(await smallSteps.isChecked()));
+ assert.ok(await hesitation.isChecked());
+ const mobileTinetti=mobilePage.getByRole('region',{name:'Saisie du Tinetti'});
+ await mobileTinetti.getByLabel('Réalisation du Tinetti').selectOption('Réalisé');
+ const columns=await mobileTinetti.locator('.tinetti-grid').first().evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(' ').length);
+ assert.equal(columns,2,'largeur Tinetti mobile : '+(await mobileTinetti.boundingBox()).width+' px');
+ assert.ok(await mobileTinetti.locator('.tinetti-grid').evaluateAll(grids=>grids.every(grid=>grid.scrollWidth<=grid.clientWidth)));
+ await mobileTinetti.screenshot({path:'/tmp/infinity-tinetti-mobile.png'});
+ assert.ok(await mobilePage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await mobileKine.close();
  const mobile=await browser.newContext({...devices['iPhone 13'],locale:'fr-FR',acceptDownloads:true});await mobile.addCookies([{name:'infinity_session',value:sessions.secretariat.token,url:'http://localhost:31007'}]);const secretary=await mobile.newPage();await secretary.goto('http://localhost:31007');await secretary.getByRole('button',{name:'Bilans résidents',exact:true}).click();await secretary.locator('[data-assessment-view="history"]').click();assert.equal(await secretary.locator('#assessment-new').count(),0);assert.equal(await secretary.locator('[data-assessment-action="trash"]').count(),0);assert.equal(await secretary.locator('[data-assessment-action="purge"]').count(),0);assert.ok(await secretary.locator(`[data-assessment-row="${initial.id}"]`).isVisible());assert.ok(await secretary.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await mobile.close();
  const erase=row.getByRole('button',{name:'Supprimer définitivement',exact:true});
@@ -170,5 +289,5 @@ try{
  assert.equal(app.db.prepare('SELECT 1 FROM assessment_versions WHERE assessment_id=?').get(initial.id),undefined);
  assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(old.id).data,oldData);
  assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);
- console.log('PASS compact assessment browser: optional preservation, MRC 0/NE, TUG rapid observations and optional fields on desktop/mobile, guided/partial Tinetti, adapted, unperformed and impossible 5xSTS, impossible walk, manual texts, finalization, neutral PDF, exact record, manual Titan, draft deletion cancellation/restore, confirmed permanent deletion after PDF export, roles and mobile layout.');
+ console.log('PASS compact assessment browser: optional preservation, MRC 0/NE, TUG multi-select and all five risk colors, live Tinetti counters and boundary colors, persistence and responsive grids, adapted, unperformed and impossible 5xSTS, impossible walk, manual texts, finalization, neutral PDF, exact record, manual Titan, draft deletion cancellation/restore, confirmed permanent deletion after PDF export, roles and mobile layout.');
 }finally{await browser?.close();if(app.server.listening)await new Promise(r=>app.server.close(r));app.close();rmSync(directory,{recursive:true,force:true});}

@@ -5,7 +5,7 @@ import {emptyClinical,validateClinical,generateDiagnosis,generateProject} from '
 import {newCompactClinical} from '../src/assessments-compact.js';
 import {assessmentPDF} from './assessment-pdf.js';
 import {technicalLog} from './log.js';
-const pdfFormatVersion=3;
+const pdfFormatVersion=4;
 export function initializeAssessments(db){db.exec(`CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,resident_id TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_tracking(assessment_id TEXT PRIMARY KEY,deleted_at TEXT,deleted_by TEXT,titan_at TEXT,titan_by TEXT,titan_name TEXT);
  CREATE TABLE IF NOT EXISTS assessment_versions(id INTEGER PRIMARY KEY,assessment_id TEXT NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,data TEXT NOT NULL);
