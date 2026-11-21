@@ -10,7 +10,7 @@ import {createApp} from '../backend/server.js';
 import {newSession} from '../backend/auth.js';
 import {seed,createTransmission} from '../src/domain.js';
 import {emptyClinical,comparison} from '../src/assessments-domain.js';
-import {newCompactClinical,validateCompact,compactTinetti,compactDiagnosis,compactProject,effectiveTug,effectiveAids,muscleRows,pomaItems} from '../src/assessments-compact.js';
+import {newCompactClinical,validateCompact,compactTinetti,compactDiagnosis,compactProject,effectiveTug,effectiveAids,muscleRows,pomaItems,tugRisk,recordedTugDetails} from '../src/assessments-compact.js';
 import {assessmentPDF} from '../backend/assessment-pdf.js';
 const complete=()=>{const c=newCompactClinical();c.reason='Évaluation fonctionnelle fictive';c.mrc.status='Réalisable';c.walk.possible='Possible';for(const key of ['tug','tinetti','chair']){c[key].status='Non réalisable';c[key].reason='Refus du résident';}return c;};
 test('compact defaults, MRC 0/NE/missing, partial results and conditional fields',()=>{
@@ -22,7 +22,66 @@ test('compact defaults, MRC 0/NE/missing, partial results and conditional fields
 });
 test('walking dependencies, actual aids, guided Tinetti 16+12, NE and protocol-sensitive comparisons',()=>{
  const c=complete();c.walk.aidEnabled=true;c.walk.aids=['Aide humaine','Déambulateur 2 roues'];assert.deepEqual(effectiveAids(c,c.tug),c.walk.aids);c.tug.aidsOverride=true;c.tug.aids=['Canne simple'];assert.deepEqual(effectiveAids(c,c.tug),['Canne simple']);c.tinetti.status='Réalisé';c.tinetti.protocol='Standard';for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);assert.deepEqual(Object.fromEntries(['balance','gait','total'].map(k=>[k,compactTinetti(c)[k]])),{balance:16,gait:12,total:28});assert.match(compactTinetti(c).interpretation,/faible/);for(const [target,label] of [[18,'élevé'],[19,'intermédiaire'],[24,'intermédiaire'],[25,'faible'],[28,'faible']]){let remaining=target;for(const [id,,,values] of pomaItems){const points=Math.min(values.length-1,remaining);c.tinetti.items[id]=String(points);remaining-=points;}assert.equal(compactTinetti(c).total,target);assert.ok(compactTinetti(c).interpretation.includes(label));}c.tinetti.items.sitting='NE';assert.equal(compactTinetti(c).total,null);assert.equal(compactTinetti(c).balance,null);assert.match(compactTinetti(c).interpretation,/pas de total/);c.tinetti.items.sitting='0';assert.equal(compactTinetti(c).total,27);c.walk.possible='Impossible';c.tug.status='Réalisé';c.tug.time='50';assert.equal(effectiveTug(c).status,'Non réalisable');assert.equal(effectiveTug(c).time,'');assert.equal(compactTinetti(c).gait,null);assert.equal(compactTinetti(c).total,null);assert.ok(!compactProject(c).includes('Entretenir la marche'));assert.match(compactProject(c),/ne pas proposer de marche/);
- const before=complete(),after=complete();for(const x of [before,after]){x.tug.status='Réalisé';x.tug.protocol='Standard';x.tug.time='20';}after.tug.time='18';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/-2/);after.tug.protocol='Adapté';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/comparaison chiffrée non appliquée/);
+ const before=complete(),after=complete();for(const x of [before,after]){delete x.tug.details;x.tug.status='Réalisé';x.tug.protocol='Standard';x.tug.time='20';}after.tug.time='18';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/-2/);after.tug.protocol='Adapté';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/comparaison chiffrée non appliquée/);
+});
+test('TUG thresholds, explicit selections, invalid durations and impossible status',()=>{
+ const c=complete(),tug=c.tug;
+ assert.deepEqual(recordedTugDetails(tug),[]);
+ tug.status='Réalisé';
+ for(const [time,risk] of [['11,99','faible'],['12.00','modéré'],['19,99','modéré'],['20.00','élevé'],['29,99','élevé'],['30.00','très élevé']]){
+  tug.time=time;
+  assert.equal(tugRisk(tug),'Risque de chute '+risk);
+  validateCompact(c,true);
+ }
+ for(const time of ['-1','0','abc','1e2','12,3.4']){
+  tug.time=time;
+  assert.equal(tugRisk(tug),'');
+  assert.throws(()=>validateCompact(c),/Temps invalide/);
+ }
+ tug.time='24,5';
+ tug.details.technicalAid='Aucune';
+ tug.details.observations=['Petits pas','Instabilité'];
+ assert.deepEqual(recordedTugDetails(tug),[['Aide technique','Aucune'],['Observations','Instabilité, Petits pas']]);
+ tug.details.observations.push('Instabilité');
+ assert.throws(()=>validateCompact(c),/Observations du TUG invalides/);
+ tug.details.observations.pop();
+ tug.status='Non réalisable';
+ tug.reason='';
+ assert.throws(()=>validateCompact(c),/Aucun temps/);
+ tug.time='';
+ validateCompact(c,true);
+ assert.equal(tugRisk(tug),'Risque de chute non évaluable par le TUG');
+ assert.deepEqual(tug.details.observations,['Petits pas','Instabilité']);
+});
+test('TUG PDF omits blank fields, retains observations when impossible and reads older compact bilans',t=>{
+ const date='2026-11-12',stamp=date+'T12:00:00Z';
+ const record={date,type:'initial',practitioner:'Amélie',reviewWindow:'3m',finalizedAt:stamp,diagnosisValidatedAt:stamp,projectValidatedAt:stamp,clinical:complete()};
+ const extract=()=>{
+  const result=spawnSync('pdftotext',['-','-'],{input:assessmentPDF(record),encoding:'utf8'});
+  if(result.error?.code==='ENOENT')return null;
+  assert.equal(result.status,0,result.stderr);
+  return result.stdout.split('2.3 — Timed Up and Go (TUG)')[1].split('2.4 — Tinetti')[0];
+ };
+ const tug=record.clinical.tug;
+ tug.reason='';
+ tug.details.technicalAid='Aucune';
+ tug.details.observations=['Hésitation'];
+ const impossible=extract();
+ if(impossible===null){t.skip('pdftotext indisponible');return;}
+ assert.match(impossible,/Risque de chute non évaluable par le TUG/);
+ assert.match(impossible,/Aide technique : Aucune/);
+ assert.match(impossible,/Observations : Hésitation/);
+ assert.doesNotMatch(impossible,/Temps :|Assistance humaine|Transfert assis-debout|Observations complémentaires|Instabilité/);
+
+ delete tug.details;
+ Object.assign(tug,{status:'Réalisé',time:'18',protocol:'Adapté',conditions:'Conditions historiques',aidsOverride:true,aids:['Canne simple']});
+ assert.doesNotThrow(()=>validateCompact(record.clinical,true));
+ const legacy=extract();
+ assert.match(legacy,/18 secondes/);
+ assert.match(legacy,/Aides utilisées : Canne simple/);
+ assert.match(legacy,/Conditions : Conditions historiques/);
+ assert.match(legacy,/Protocole : Adapté/);
+ assert.doesNotMatch(legacy,/Risque de chute faible|Risque de chute modéré/);
 });
 test('API: soft delete/restore, authorization, finalized immutability, Titan tracking, neutral PDF and additive persistence',async()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'infinity-compact-'));let app=createApp({directory:dir,origin:'http://localhost:31009'});const state=seed();state.residents[0].code='IDENTITE-RESIDENT-XYZ';state.residents[0].sector='Premier étage';state.transmissions=[createTransmission(state,{residentId:state.residents[0].id,date:'2026-11-12',activity:'Marche',practitioner:'Amélie',text:'Transmission fictive conservée'})];app.db.prepare('UPDATE state SET data=?').run(JSON.stringify(state));const baseline=app.db.prepare('SELECT * FROM state').get();
