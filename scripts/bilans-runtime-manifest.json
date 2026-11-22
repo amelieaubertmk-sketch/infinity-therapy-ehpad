@@ -1,5 +1,5 @@
 {
-  "release": "2.6.1",
+  "release": "2.6.2",
   "base": "2.6.0",
   "files": {
     "server.js": {
@@ -7,15 +7,15 @@
       "base260": "49f6fbbf234a6fef13ef3174e4c2b7531c2aa8953d0ea8c8fc37beebb2fae3e2"
     },
     "index.html": {
-      "sha256": "7b339badbf550a25698919849f6b24b12993e4f0b5aa6a136e039896315c1b2e",
+      "sha256": "a6a86a4bec3d511c35893e264783922e3c4751670a02ed6ad89c9300f96a59ec",
       "base260": "23d7ed25ed84ad80e5de1587767174304402e3660ce53e3073cdf15911750b50"
     },
     "package.json": {
-      "sha256": "b3427bc341edc24de3872c9c7be064eefd6a3dac81a36d7334f9c6071ef05f77",
+      "sha256": "ae079b077eab6b3846893a58929e9299150e61e3518be2a2ef159a74a8e785e5",
       "base260": "46f00fe3daf650612e4434aeb01dbf4674efd66e0beb299f5c0939c9a14b7055"
     },
     "src/app.js": {
-      "sha256": "1be102b882641c4bd7b2b5a06c9572a1318abc3a8b4150965ad29b4c1f0e6ed3",
+      "sha256": "f8d59b51a235eb275f7806e1d90e7913a0d51657c6e71a124cd3e1e7aadde7ef",
       "base260": "2985871b64511c996b61c0de3f0aebcd568f036b9d726a3c7dafb4a5aa7e262d"
     },
     "src/domain.js": {
@@ -31,27 +31,27 @@
       "base260": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f"
     },
     "src/assessments.js": {
-      "sha256": "e24d9766deacef8e56426f5dd6e92b0b9f8220e50f33049d78440137dadadfc3",
+      "sha256": "fa1abdfaaebed6988c5fb1f4d44199a23f81f0aa8d6ce1954f8fa2c437524d19",
       "base260": "0e60b9f175986a320763c03702d24ad990f572088ff60fe93a2ccc385228c672"
     },
     "src/assessments-domain.js": {
-      "sha256": "9b8957a6cc7d565872552496b754722fe3e4d0952d84759ad722f5032a6df329",
+      "sha256": "0d264a1c0b370ac3325c732c61094a74b3f292a575b4f33d154c59348b19ab7f",
       "base260": "8c31dce20abc5dce2893d89c51127dd6a43ef168895e30810bc51205d9246712"
     },
     "src/assessments-compact.js": {
-      "sha256": "cab696e83ff7b1fe285d46fed72e7770f6615a9e6d7636251f50271e48dc4c0d",
+      "sha256": "c803de60de310ac9bf50776ef0359e30ec30c5414a79a92983db03b3d0cc8203",
       "base260": "2264f6ca047e763540e7d603e846340df9907e638ad0bcb77a81d9f8c8031177"
     },
     "backend/server.js": {
-      "sha256": "be6f43489bd5484878fe8884108c2b16ab71763307f0a9fc676d4c9683c9b42a",
+      "sha256": "6d01f06a6aabd323c8d6ea3bd71346ba70e0fb1116310b1394bfb269099941a5",
       "base260": "c46c58842045c876a62fb7fceff6ecc692fb66f0cf36c8627cadc5e4bcb645a4"
     },
     "backend/assessments.js": {
-      "sha256": "ace56130fc2cbad36430c6bd2f6aba86be6bd602f5f189846e33ac256a2b50fd",
+      "sha256": "d43c710b852fc6e302a2c3667e2cb91ca388e701b536ed442bb5e9e74e86f135",
       "base260": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163"
     },
     "backend/assessment-pdf.js": {
-      "sha256": "49445180897390448378a2ba1ee94b67c3dda0ff8473735df1fa06c1da42a88a",
+      "sha256": "f6791dcb68c2e1815607d8c16615c3f7800a6e7b6086e2f232c525cbd852883b",
       "base260": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f"
     },
     "backend/pdf-font.js": {
@@ -102,5 +102,6 @@
     "assets/fonts/OpenSans-LICENSE.txt": {
       "sha256": "f8da393148aa41984d22d5e607929f878fb3846885618d533708f80415f77265"
     }
-  }
+  },
+  "runtime": true
 }

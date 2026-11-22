@@ -1,7 +1,7 @@
 import {today} from './domain.js?v=2.5.1';
 import {request,user} from './store.js?v=2.5.1';
-import {anamnesisFields,walkingFields,jointFields,testDefinitions,testResult,comparison} from './assessments-domain.js?v=2.6.1';
-import {muscleRows,assistanceOptions,reasons,findingOptions,pomaItems,effectiveTug,compactTinetti,tinettiFields,tinettiStatus,tinettiStatuses,tinettiGroups,tinettiContext,tinettiAssistanceWarning,tinettiIncomplete,newTinettiDetails,testDescriptions,reviewLabel,tugFields,tugObservations,newTugDetails,decimalSeconds,tugRiskLevel,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatuses,chairArms,chairAssistance,chairStatus,chairResult} from './assessments-compact.js?v=2.6.1';
+import {anamnesisFields,walkingFields,jointFields,testDefinitions,testResult,comparison} from './assessments-domain.js?v=2.6.2';
+import {muscleRows,assistanceOptions,reasons,findingOptions,pomaItems,effectiveTug,compactTinetti,tinettiFields,tinettiStatus,tinettiStatuses,tinettiGroups,tinettiContext,tinettiAssistanceWarning,tinettiIncomplete,newTinettiDetails,testDescriptions,reviewLabel,tugFields,tugObservations,newTugDetails,decimalSeconds,tugRiskLevel,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatuses,chairArms,chairAssistance,chairStatus,chairResult} from './assessments-compact.js?v=2.6.2';
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let records=[],trash=[],current=null,residents=[],filter='',view='active',dirty=false,reviewed=false,inFlight=false,host,notify,activeUser=null,ticket=0;
 const $=s=>host?.querySelector(s),clinician=()=>['admin','kine'].includes(user?.role),owns=r=>clinician()&&(r.owner===user.id||user.role==='admin'),editable=()=>current?.status==='draft'&&!current.deletedAt&&owns(current),disabled=()=>editable()?'':'disabled';
@@ -62,10 +62,9 @@ function tugSelection(details){
  return selected.join(', ')||'Sélectionner';
 }
 function tugFeedback(tug){
- if(tug.status==='Réalisé'&&!tug.details&&tug.protocol==='Adapté')return `<p class="help">${tugLegacyAdaptation}</p>`;
  const level=tugRiskLevel(tug);
  if(!level)return tug.time?'<p>Saisir une durée positive en secondes.</p>':'';
- return `<p>${riskTag(level,tugRisk(tug))}</p>${level==='unavailable'?'':`<p class="help">${tugContext}<br>${tugVigilance}</p>`}`;
+ return `<p>${riskTag(level,tugRisk(tug))}</p>${level==='unavailable'?'':`<p class="help">${tugContext}<br>${tugVigilance}${!tug.details&&tug.protocol==='Adapté'?'<br>'+tugLegacyAdaptation:''}</p>`}`;
 }
 function prepareTugDetails(){
  const tug=current.clinical.tug;

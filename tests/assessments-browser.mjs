@@ -32,10 +32,10 @@ try{
  const distance=field('clinical.walk.distance'),wheelchair=field('clinical.walk.wheelchair');
  assert.equal(await distance.getAttribute('type'),'text');
  await wheelchair.selectOption('Non');
- for(const value of ['25 m','100 m','> 100 m']){
+ for(const value of ['25','25 m','100','100 m','>100','> 100','>100 m','> 100 m']){
   await distance.fill(value);
   const saved=await write('',()=>page.locator('#assessment-save').click());
-  assert.equal(saved.clinical.walk.distance,value);
+  assert.equal(saved.clinical.walk.distance,value.startsWith('>')?'> 100 m':value);
  }
  await distance.fill('125 m');
  const invalidDistance=page.waitForResponse(response=>response.request().method()==='PUT'&&response.url().endsWith('/'+initial.id));
@@ -145,7 +145,7 @@ try{
   }
  };
  for(const [score,level,label,description] of [
-  [18,'high','élevé','Troubles importants de l’équilibre ou de la marche.'],
+  [18,'veryHigh','très élevé','Troubles importants de l’équilibre ou de la marche.'],
   [19,'moderate','modéré','Troubles de l’équilibre ou de la marche.'],
   [24,'moderate','modéré','Troubles de l’équilibre ou de la marche.'],
   [25,'low','faible','Bon équilibre et bonne qualité de la marche.'],
@@ -229,11 +229,22 @@ try{
  assert.match(proposal.diagnosis,/TUG : 12 secondes — Risque de chute modéré/);
  assert.equal(proposal.diagnosis.match(/vigilance adaptée/g).length,1);
  assert.doesNotMatch(proposal.diagnosis,/fauteuil roulant|protocole|aucune classification/i);
+ await setScore(11);
+ await tugTime.fill('35');
+ await chairTime.fill('19');
+ await chairAssistance.selectOption('Aucune');
+ await risk(tinetti,'Risque de chute très élevé',colors.veryHigh);
+ await risk(tug,'Risque de chute très élevé',colors.veryHigh);
+ assert.match(await chair.getByRole('status').innerText(),/Performance nettement ralentie/);
  await wheelchair.selectOption('Oui');
  const withWheelchair=await write('',()=>page.locator('#assessment-generate').click());
  assert.match(withWheelchair.diagnosis,/Utilisation habituelle d’un fauteuil roulant\./);
  assert.match(withWheelchair.diagnosis,/Marche possible/);
  assert.match(withWheelchair.diagnosis,/sans conclusion diagnostique médicale/);
+ assert.match(withWheelchair.diagnosis,/Tinetti : 11\/28 — Risque de chute très élevé/);
+ assert.match(withWheelchair.diagnosis,/TUG : 35 secondes — Risque de chute très élevé/);
+ assert.match(withWheelchair.diagnosis,/5xSTS : 19 secondes — Performance nettement ralentie/);
+ assert.doesNotMatch(withWheelchair.diagnosis,/Score descriptif|protocole standard|aucune classification/i);
  const manual=withWheelchair.diagnosis+'\n\nNote manuelle validée.';
  const manualProject='Objectif validé : progresser lors des levers de chaise.';
  await field('diagnosis').fill(manual);
@@ -251,12 +262,12 @@ try{
  await page.reload();await page.getByRole('button',{name:'Bilans résidents',exact:true}).click();await page.locator(`[data-assessment-row="${initial.id}"] [data-assessment-action="open"]`).click();assert.equal(await field('diagnosis').inputValue(),manual);
  assert.equal(await field('project').inputValue(),manualProject);
  assert.match(await page.locator('#assessment-review').innerText(),/Les résultats ont changé depuis la génération/);
- assert.equal(await chairTime.inputValue(),'15,01');
+ assert.equal(await chairTime.inputValue(),'19');
  assert.equal(await chairArms.inputValue(),'Non');
- assert.equal(await chairAssistance.inputValue(),'Simple surveillance');
+ assert.equal(await chairAssistance.inputValue(),'Aucune');
  assert.equal(await chairNotes.inputValue(),'Fatigabilité fictive au dernier lever.');
- assert.equal(await tugTime.inputValue(),'12');
- assert.match(await tug.getByRole('status').innerText(),/Risque de chute modéré/);
+ assert.equal(await tugTime.inputValue(),'35');
+ assert.match(await tug.getByRole('status').innerText(),/Risque de chute très élevé/);
  assert.equal(await tugAid.inputValue(),'Canne simple');
  assert.equal(await tugAssistance.inputValue(),'Simple surveillance');
  assert.equal(await tugTransfer.inputValue(),'Avec utilisation des accoudoirs');
@@ -266,28 +277,28 @@ try{
  assert.ok(await observation(tug,'Difficulté au demi-tour').isChecked());
  assert.ok(await observation(tug,'Petits pas').isChecked());
  assert.ok(!(await observation(tug,'Instabilité').isChecked()));
- assert.match(await balance.innerText(),/16 \/ 16/);
- assert.match(await gait.innerText(),/8 \/ 12/);
- assert.match(await total.innerText(),totalPattern(24));
+ assert.match(await balance.innerText(),/11 \/ 16/);
+ assert.match(await gait.innerText(),/0 \/ 12/);
+ assert.match(await total.innerText(),totalPattern(11));
  assert.equal(await tinettiAid.inputValue(),'Deux cannes');
  assert.equal(await tinettiAssistance.inputValue(),'Aide physique');
  assert.equal(await tinettiNotes.inputValue(),'Un rappel de consigne a été nécessaire.');
  assert.equal(await field('clinical.observations').inputValue(),anamnese);assert.equal(await distance.inputValue(),'> 100 m');assert.equal(await field('clinical.joints').count(),0);assert.equal(await field('reviewWindow').inputValue(),'3m');await field('reviewWindow').selectOption('clinical');await page.locator('#assessment-reviewed').check();await write('/finalize',()=>page.locator('#assessment-finalize').click());assert.equal(await page.locator('#assessment-trash').count(),0);assert.equal(await page.locator('#assessment-save').count(),0);
  await page.locator('[data-assessment-view="pending"]').click();const row=page.locator(`[data-assessment-row="${initial.id}"]`);await row.getByRole('button',{name:'Voir le PDF',exact:true}).click();assert.match(await page.locator('#modal').innerText(),/CODE-SECRET-PATIENT/);assert.ok(await page.locator('#assessment-download').isDisabled());await page.locator('#assessment-confirm-resident').check();const download=page.waitForEvent('download');await page.locator('#assessment-download').click();const pdf=await download;assert.equal(pdf.suggestedFilename(),'Bilan_Kinesitherapique_2026-11-12.pdf');const file=path.join(directory,'download.pdf');await pdf.saveAs(file);const extracted=spawnSync('pdftotext',[file,'-'],{encoding:'utf8'});assert.equal(extracted.status,0);for(const token of ['CODE-SECRET-PATIENT',initial.residentId,initial.id,'OBSERVATION_OPTIONNELLE_MASQUEE','ARTICULAIRE_OPTIONNEL_MASQUE','Premier étage'])assert.ok(!extracted.stdout.includes(token));const tugPDF=extracted.stdout.split('2.4 — Timed Up and Go (TUG)')[1].split('2.5 — Five Times')[0].replace(/\s+/g,' ');
- for(const line of ['Temps 12 secondes','Interprétation Risque de chute modéré','Aide technique Canne simple','Assistance humaine Simple surveillance','Transfert assis-debout Avec utilisation des accoudoirs','Observations Difficulté au demi-tour, Petits pas','Observations complémentaires Ralentissement fictif au demi-tour.'])assert.ok(tugPDF.includes(line),line);
+ for(const line of ['Temps 35 secondes','Interprétation Risque de chute très élevé','Aide technique Canne simple','Assistance humaine Simple surveillance','Transfert assis-debout Avec utilisation des accoudoirs','Observations Difficulté au demi-tour, Petits pas','Observations complémentaires Ralentissement fictif au demi-tour.'])assert.ok(tugPDF.includes(line),line);
  const chairPDF=extracted.stdout.split('2.5 — Five Times Sit-to-Stand (5xSTS)')[1].split('2.7 — Transferts')[0].replace(/\s+/g,' ');
- for(const phrase of ['Temps 15,01 secondes','Performance nettement ralentie','Sans utilisation des bras','Simple surveillance','Fatigabilité fictive au dernier lever.'])assert.ok(chairPDF.includes(phrase),phrase);
+ for(const phrase of ['Temps 19 secondes','Performance nettement ralentie','Sans utilisation des bras','Aucune','Fatigabilité fictive au dernier lever.'])assert.ok(chairPDF.includes(phrase),phrase);
  assert.doesNotMatch(chairPDF,/Protocole|Conditions de passation|risque de chute/);
  const pdfText=extracted.stdout.replace(/\s+/g,' ');
- for(const phrase of ['Note manuelle validée.', 'Tinetti : 24/28 — Risque de chute modéré.', 'TUG : 12 secondes — Risque de chute modéré.', 'Périmètre de marche supérieur à 100 mètres', reason, anamnese])assert.ok(pdfText.includes(phrase),phrase);
+ for(const phrase of ['Note manuelle validée.', 'Tinetti : 11/28 — Risque de chute très élevé.', 'TUG : 35 secondes — Risque de chute très élevé.', '5xSTS : 19 secondes — Performance nettement ralentie', 'Périmètre de marche supérieur à 100 mètres', reason, anamnese])assert.ok(pdfText.includes(phrase),phrase);
  assert.ok(pdfText.indexOf(reason)<pdfText.indexOf(anamnese));
  assert.ok(pdfText.indexOf(anamnese)<pdfText.indexOf('02 — Examen'));
  assert.ok(extracted.stdout.includes(manualProject));
  assert.doesNotMatch(tugPDF,/Instabilité|Hésitation|Aides utilisées|Protocole|Conditions de passation/);
  const tinettiPDF=extracted.stdout.split('2.3 — Tinetti POMA 28')[1].split('2.4 — Timed Up')[0].replace(/\s+/g,' ');
- for(const phrase of ['Équilibre 16/16','Marche 8/12','Total 24/28','Risque de chute modéré','Troubles de l’équilibre ou de la marche.','Aide technique utilisée Deux cannes','Assistance humaine Aide physique','Un rappel de consigne a été nécessaire.'])assert.ok(tinettiPDF.includes(phrase),phrase);
+ for(const phrase of ['Équilibre 11/16','Marche 0/12','Total 11/28','Risque de chute très élevé','Troubles importants de l’équilibre ou de la marche.','Aide technique utilisée Deux cannes','Assistance humaine Aide physique','Un rappel de consigne a été nécessaire.'])assert.ok(tinettiPDF.includes(phrase),phrase);
  assert.doesNotMatch(tinettiPDF,/Protocole|Conditions de passation|Aides proposées|Score provisoire/);
- assert.match(extracted.stdout,/NE/);assert.match(extracted.stdout,/24\/28/);assert.ok(!extracted.stdout.includes('Rotation à 360°'));await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();assert.ok(await row.isVisible());accept=false;await row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click();assert.ok(await row.isVisible());accept=true;await write('/titan',()=>row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click());assert.equal(await page.locator(`[data-assessment-row="${initial.id}"]`).count(),0);await page.locator('[data-assessment-view="history"]').click();assert.match(await page.locator(`[data-assessment-row="${initial.id}"]`).innerText(),/Saisi sur Titan/);
+ assert.match(extracted.stdout,/NE/);assert.match(extracted.stdout,/11\/28/);assert.ok(!extracted.stdout.includes('Rotation à 360°'));await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();assert.ok(await row.isVisible());accept=false;await row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click();assert.ok(await row.isVisible());accept=true;await write('/titan',()=>row.getByRole('button',{name:'Marquer comme saisi sur Titan',exact:true}).click());assert.equal(await page.locator(`[data-assessment-row="${initial.id}"]`).count(),0);await page.locator('[data-assessment-view="history"]').click();assert.match(await page.locator(`[data-assessment-row="${initial.id}"]`).innerText(),/Saisi sur Titan/);
  const abandoned=await create('2026-11-13');await field('clinical.reason').fill('Brouillon abandonné, données fictives');await write('',()=>page.locator('#assessment-save').click());accept=false;await page.locator('#assessment-trash').click();assert.ok(await page.locator('#assessment-trash').isVisible());accept=true;await write('/trash',()=>page.locator('#assessment-trash').click());assert.equal(await page.locator(`[data-assessment-row="${abandoned.id}"]`).count(),0);await page.locator('[data-assessment-view="trash"]').click();await write('/restore',()=>page.locator(`[data-assessment-row="${abandoned.id}"]`).getByRole('button',{name:'Restaurer le brouillon',exact:true}).click());await page.locator('[data-assessment-view="active"]').click();await page.locator(`[data-assessment-row="${abandoned.id}"] [data-assessment-action="open"]`).click();assert.equal(await field('clinical.reason').inputValue(),'Brouillon abandonné, données fictives');
  await page.setViewportSize(devices['iPhone 13'].viewport);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/infinity-2.6.0-compact-iphone.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});
  await page.locator(`[data-assessment-row="${initial.id}"] [data-assessment-action="pdf"]`).click();await page.locator('#assessment-confirm-resident').check();const secondDownload=page.waitForEvent('download');await page.locator('#assessment-download').click();assert.equal((await secondDownload).suggestedFilename(),'Bilan_Kinesitherapique_2026-11-12.pdf');await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();assert.equal(await field('clinical.reason').inputValue(),'Brouillon abandonné, données fictives');
@@ -345,6 +356,39 @@ try{
  assert.equal(app.db.prepare('SELECT 1 FROM assessment_documents WHERE assessment_id=?').get(initial.id),undefined);
  assert.equal(app.db.prepare('SELECT 1 FROM assessment_versions WHERE assessment_id=?').get(initial.id),undefined);
  assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(old.id).data,oldData);
+ const historicalRow=page.locator('[data-assessment-row="legacy-preserved"]');
+ assert.equal(app.db.prepare('SELECT 1 FROM assessment_documents WHERE assessment_id=?').get(old.id),undefined);
+ await historicalRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click();
+ await confirmation.fill('effacer');
+ const oldRemoved=page.waitForResponse(response=>response.url().endsWith('/'+old.id+'/purge')&&response.request().method()==='POST');
+ await confirmDeletion.click();
+ assert.deepEqual(await (await oldRemoved).json(),{deletedId:old.id});
+ await historicalRow.waitFor({state:'detached'});
+ assert.equal(app.db.prepare('SELECT 1 FROM assessments WHERE id=?').get(old.id),undefined);
+ assert.ok(app.db.prepare('SELECT 1 FROM assessments WHERE id=?').get(abandoned.id));
  assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);
- console.log('PASS compact assessment browser: walking perimeter 25 m, 100 m and > 100 m, Tinetti 24 and TUG 12 co-reported, optional preservation, MRC 0/NE, TUG multi-select and all five risk colors, live Tinetti counters and boundary colors, persistence and responsive grids, adapted, unperformed and impossible 5xSTS, impossible walk, manual texts, finalization, neutral PDF, exact record, manual Titan, draft deletion cancellation/restore, confirmed permanent deletion after PDF export, roles and mobile layout.');
+
+ const neverExported=await create('2026-11-14');
+ await field('clinical.reason').fill('Vérification fictive de la suppression sans export.');
+ await field('clinical.mrc.status').selectOption('Réalisable');
+ await field('clinical.walk.possible').selectOption('Possible');
+ await tinettiStatus.selectOption('Non réalisé');
+ await tugImpossible.check();
+ await chairStatus.selectOption('Non réalisé');
+ await write('',()=>page.locator('#assessment-generate').click());
+ await page.locator('#assessment-reviewed').check();
+ const finalNeverExported=await write('/finalize',()=>page.locator('#assessment-finalize').click());
+ assert.equal(finalNeverExported.status,'final');
+ assert.equal(app.db.prepare('SELECT 1 FROM assessment_documents WHERE assessment_id=?').get(neverExported.id),undefined);
+ const unexportedRow=page.locator(`[data-assessment-row="${neverExported.id}"]`);
+ await unexportedRow.getByRole('button',{name:'Supprimer définitivement',exact:true}).click();
+ await confirmation.fill('effacer');
+ const withoutExport=page.waitForResponse(response=>response.url().endsWith('/'+neverExported.id+'/purge')&&response.request().method()==='POST');
+ await confirmDeletion.click();
+ assert.deepEqual(await (await withoutExport).json(),{deletedId:neverExported.id});
+ await unexportedRow.waitFor({state:'detached'});
+ assert.equal(app.db.prepare('SELECT 1 FROM assessments WHERE id=?').get(neverExported.id),undefined);
+ assert.ok(app.db.prepare('SELECT 1 FROM assessments WHERE id=?').get(abandoned.id));
+ assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);
+ console.log('PASS compact assessment browser: walking perimeter 25 m, 100 m and > 100 m, Tinetti 24/11, TUG 12/35 and 5xSTS 19 co-reported, optional preservation, MRC 0/NE, TUG multi-select and all five risk colors, live Tinetti counters and boundary colors, persistence and responsive grids, adapted, unperformed and impossible 5xSTS, impossible walk, manual texts, finalization, neutral PDF, exact record, manual Titan, draft deletion cancellation/restore, permanent deletion of current and legacy final records with and without PDF export, roles and mobile layout.');
 }finally{await browser?.close();if(app.server.listening)await new Promise(r=>app.server.close(r));app.close();rmSync(directory,{recursive:true,force:true});}

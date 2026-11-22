@@ -2,10 +2,11 @@ import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import {snapshot,audit} from './database.js';
 import {emptyClinical,validateClinical,generateDiagnosis,generateProject} from '../src/assessments-domain.js';
-import {newCompactClinical,walkingPerimeter,walkingPerimeterError} from '../src/assessments-compact.js';
-import {assessmentPDF} from './assessment-pdf.js';
+import {newCompactClinical,walkingPerimeter,walkingPerimeterError,assessmentRulesVersion} from '../src/assessments-compact.js';
+import {assessmentPDF,assessmentPdfVersion} from './assessment-pdf.js';
 import {technicalLog} from './log.js';
-const pdfFormatVersion=5;
+export const assessmentRuntime=Object.freeze({api:'2.6.2',rules:assessmentRulesVersion,pdf:assessmentPdfVersion});
+const pdfFormatVersion=6;
 export function initializeAssessments(db){db.exec(`CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,resident_id TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_tracking(assessment_id TEXT PRIMARY KEY,deleted_at TEXT,deleted_by TEXT,titan_at TEXT,titan_by TEXT,titan_name TEXT);
  CREATE TABLE IF NOT EXISTS assessment_versions(id INTEGER PRIMARY KEY,assessment_id TEXT NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,data TEXT NOT NULL);
@@ -104,6 +105,7 @@ export function assessmentRoute({db,user,route,method,body,json}){
   if(distance&&distance!==previous.clinical.walk.distance){
    const perimeter=walkingPerimeter(distance);
    if(!perimeter||perimeter.meters>100)throw Error(walkingPerimeterError);
+   if(perimeter.meters===null)input.clinical.walk.distance=perimeter.label;
   }
  }
  const changed=!isDeepStrictEqual(previous.clinical,input.clinical)||previous.date!==input.date||previous.practitioner!==input.practitioner;next={...next,...Object.fromEntries(['date','practitioner','clinical','diagnosis','project','frequency','duration','reviewDate','evolution','reviewWindow'].filter(k=>input[k]!==undefined).map(k=>[k,input[k]])),updatedAt:now,updatedBy:user.id};

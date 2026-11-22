@@ -17,7 +17,23 @@ export async function diagnoseBilans({project,base,manifest,checkSyntax=true,dat
  }
  const server=path.join(root,'backend','server.js');if(existsSync(server)){try{result.routes={missing:planStaticRouteRepair(readFileSync(server,'utf8')).missing};}catch(e){result.routes={error:e.message};}}
  if(base){const address=new URL(base);if(!['http:','https:'].includes(address.protocol)||address.username||address.password)throw Error('Adresse de diagnostic invalide.');result.origin=address.origin;
-  result.http=await Promise.all(['app.js','store.js','domain.js','demo-store.js','assessments.js','assessments-domain.js','assessments-compact.js'].map(async file=>{const relative='src/'+file,url=new URL('/'+relative+'?v=2.6.1&diagnostic='+Date.now(),address),check={file:relative};try{const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(4000)});check.status=response.status;check.mime=response.headers.get('content-type')||'';if(response.ok){const bytes=Buffer.from(await response.arrayBuffer());check.javascript=/^(text|application)\/javascript(?:;|$)/i.test(check.mime);check.matchesDisk=existsSync(path.join(root,relative))&&digest(bytes)===digest(readFileSync(path.join(root,relative)));}}catch{check.network='unreachable';}return check;}));
+  if(manifest.runtime){
+   const runtimePath='/api/assessment-runtime';
+   const check={expected:manifest.release};
+   try{
+    const response=await fetch(new URL(runtimePath,address),{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(4000)});
+    check.status=response.status;
+    if(response.ok){
+     const payload=await response.json();
+     check.loaded=Object.fromEntries(['api','rules','pdf'].map(key=>[key,/^\d+\.\d+\.\d+$/.test(payload?.[key])?payload[key]:null]));
+    }
+   }catch{check.network='unreachable';}
+   check.matches=check.status===200&&['api','rules','pdf'].every(key=>check.loaded?.[key]===check.expected);
+   result.runtime=check;
+   if(!check.matches)result.conclusions.push('Le processus Node qui répond ne confirme pas la version '+check.expected+' des bilans. Vérifier le projet configuré et redémarrer la tâche réellement utilisée.');
+  }
+
+  result.http=await Promise.all(['app.js','store.js','domain.js','demo-store.js','assessments.js','assessments-domain.js','assessments-compact.js'].map(async file=>{const relative='src/'+file,url=new URL('/'+relative+'?v='+encodeURIComponent(manifest.release)+'&diagnostic='+Date.now(),address),check={file:relative};try{const response=await fetch(url,{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(4000)});check.status=response.status;check.mime=response.headers.get('content-type')||'';if(response.ok){const bytes=Buffer.from(await response.arrayBuffer());check.javascript=/^(text|application)\/javascript(?:;|$)/i.test(check.mime);check.matchesDisk=existsSync(path.join(root,relative))&&digest(bytes)===digest(readFileSync(path.join(root,relative)));}}catch{check.network='unreachable';}return check;}));
  }
  if(dataFile){if(!existsSync(dataFile))result.schema={error:'Le fichier de base configuré n’existe pas ; aucune base créée.'};else{let db;try{const {DatabaseSync}=await import('node:sqlite');db=new DatabaseSync(dataFile,{readOnly:true});result.schema={};for(const [table,columns] of Object.entries(schema)){const actual=new Set(db.prepare('PRAGMA table_info('+table+')').all().map(row=>row.name));result.schema[table]={present:actual.size>0,missingColumns:columns.filter(column=>!actual.has(column))};}}catch{result.schema={error:'Schéma non inspectable en lecture seule ; aucune réparation SQLite exécutée.'};}finally{db?.close();}}}
  const [major,minor]=process.versions.node.split('.').map(Number);if(major<24||major===24&&minor<13)result.conclusions.push('Node.js 24.13 ou supérieur requis par cette application. Aucun runtime installé automatiquement.');

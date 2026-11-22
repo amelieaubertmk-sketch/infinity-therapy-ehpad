@@ -1,6 +1,6 @@
 import {reconcileLegacyTopaze,invalidateMissingPointages} from './topaze.js';
 import http from 'node:http';
-import {initializeAssessments,assessmentRoute} from './assessments.js';
+import {initializeAssessments,assessmentRoute,assessmentRuntime} from './assessments.js';
 import {exportWorkbook} from './xlsx.js';
 import {isDeepStrictEqual} from 'node:util';
 import {technicalLog} from './log.js';
@@ -23,6 +23,7 @@ export function createApp({directory,origin='http://localhost:3000'}={}){
  if(!backendHosts.includes(req.headers.host))return json(403,{error:'Hôte non autorisé.'});
  const url=new URL(req.url,allowed),route=url.pathname;
  if(!route.startsWith('/api/')){const files={'/':'index.html','/index.html':'index.html','/src/app.js':'src/app.js','/src/store.js':'src/store.js','/src/demo-store.js':'src/demo-store.js','/src/domain.js':'src/domain.js','/src/style.css':'src/style.css','/src/assessments.js':'src/assessments.js','/src/assessments-domain.js':'src/assessments-domain.js','/src/assessments-compact.js':'src/assessments-compact.js'};if(!files[route]||req.method!=='GET')return json(404,{error:'Introuvable.'});const file=files[route];let content;try{content=await readFile(path.join(root,file));}catch(error){if(error.code==='ENOENT')return json(404,{error:'Fichier statique absent : '+file});throw error;}res.writeHead(200,{...security,'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'});res.end(content);return;}
+ if(route==='/api/assessment-runtime'&&req.method==='GET')return json(200,assessmentRuntime);
  if(!['GET','POST','PUT'].includes(req.method))return json(405,{error:'Méthode interdite.'});
  let body={};if(req.method!=='GET'){if(req.headers.origin!==allowed.origin||req.headers['content-type']?.split(';')[0]!=='application/json')return json(403,{error:'Origine ou format non autorisé.'});let text='';for await(const chunk of req){text+=chunk;if(Buffer.byteLength(text)>2000000)return json(413,{error:'Requête trop volumineuse.'});}try{body=JSON.parse(text);}catch{return json(400,{error:'JSON invalide.'});}}
  if(route==='/api/login'&&req.method==='POST'){

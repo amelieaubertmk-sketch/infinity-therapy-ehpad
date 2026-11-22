@@ -3,6 +3,7 @@ import {muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,co
  recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 
+export const assessmentPdfVersion='2.6.2';
 const pageWidth=595.28,pageHeight=841.89,margin=46,width=pageWidth-2*margin,top=745,bottom=51;
 const leading=14,bodySize=10.4;
 const dateFR=value=>new Date(value+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});

@@ -21,7 +21,7 @@ test('compact defaults, MRC 0/NE/missing, partial results and conditional fields
  assert.deepEqual(muscleRows.map(r=>r[0]),['pull','push','grip','hip','kneeFlex','kneeExt','ankleDorsi','anklePlantar']);
 });
 test('walking dependencies, actual aids, guided Tinetti 16+12, NE and protocol-sensitive comparisons',()=>{
- const c=complete();c.walk.aidEnabled=true;c.walk.aids=['Aide humaine','Déambulateur 2 roues'];assert.deepEqual(effectiveAids(c,c.tug),c.walk.aids);c.tug.aidsOverride=true;c.tug.aids=['Canne simple'];assert.deepEqual(effectiveAids(c,c.tug),['Canne simple']);c.tinetti.status='Réalisé';c.tinetti.protocol='Standard';for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);assert.deepEqual(Object.fromEntries(['balance','gait','total'].map(k=>[k,compactTinetti(c)[k]])),{balance:16,gait:12,total:28});assert.match(compactTinetti(c).interpretation,/faible/);for(const [target,label] of [[18,'élevé'],[19,'modéré'],[24,'modéré'],[25,'faible'],[28,'faible']]){let remaining=target;for(const [id,,,values] of pomaItems){const points=Math.min(values.length-1,remaining);c.tinetti.items[id]=String(points);remaining-=points;}assert.equal(compactTinetti(c).total,target);assert.ok(compactTinetti(c).interpretation.includes(label));}c.tinetti.items.sitting='NE';assert.equal(compactTinetti(c).total,null);assert.equal(compactTinetti(c).balance,null);assert.match(compactTinetti(c).interpretation,/non évaluable/);c.tinetti.items.sitting='0';assert.equal(compactTinetti(c).total,27);c.walk.possible='Impossible';c.tug.status='Réalisé';c.tug.time='50';assert.equal(effectiveTug(c).status,'Non réalisable');assert.equal(effectiveTug(c).time,'');assert.equal(compactTinetti(c).gait,null);assert.equal(compactTinetti(c).total,null);assert.ok(!compactProject(c).includes('Entretenir la marche'));assert.match(compactProject(c),/marche est notée impossible/);
+ const c=complete();c.walk.aidEnabled=true;c.walk.aids=['Aide humaine','Déambulateur 2 roues'];assert.deepEqual(effectiveAids(c,c.tug),c.walk.aids);c.tug.aidsOverride=true;c.tug.aids=['Canne simple'];assert.deepEqual(effectiveAids(c,c.tug),['Canne simple']);c.tinetti.status='Réalisé';c.tinetti.protocol='Standard';for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);assert.deepEqual(Object.fromEntries(['balance','gait','total'].map(k=>[k,compactTinetti(c)[k]])),{balance:16,gait:12,total:28});assert.match(compactTinetti(c).interpretation,/faible/);for(const [target,label] of [[18,'très élevé'],[19,'modéré'],[24,'modéré'],[25,'faible'],[28,'faible']]){let remaining=target;for(const [id,,,values] of pomaItems){const points=Math.min(values.length-1,remaining);c.tinetti.items[id]=String(points);remaining-=points;}assert.equal(compactTinetti(c).total,target);assert.ok(compactTinetti(c).interpretation.includes(label));}c.tinetti.items.sitting='NE';assert.equal(compactTinetti(c).total,null);assert.equal(compactTinetti(c).balance,null);assert.match(compactTinetti(c).interpretation,/non évaluable/);c.tinetti.items.sitting='0';assert.equal(compactTinetti(c).total,27);c.walk.possible='Impossible';c.tug.status='Réalisé';c.tug.time='50';assert.equal(effectiveTug(c).status,'Non réalisable');assert.equal(effectiveTug(c).time,'');assert.equal(compactTinetti(c).gait,null);assert.equal(compactTinetti(c).total,null);assert.ok(!compactProject(c).includes('Entretenir la marche'));assert.match(compactProject(c),/marche est notée impossible/);
  const before=complete(),after=complete();for(const x of [before,after]){delete x.tug.details;x.tug.status='Réalisé';x.tug.protocol='Standard';x.tug.time='20';}after.tug.time='18';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/-2/);after.tug.protocol='Adapté';assert.match(comparison(before,after).find(r=>r.label==='Timed Up and Go').delta,/comparaison chiffrée non appliquée/);
 });
 test('TUG thresholds, explicit selections, invalid durations and impossible status',()=>{
@@ -80,7 +80,8 @@ test('TUG PDF omits blank fields, retains observations when impossible and reads
  assert.match(legacy,/18 secondes/);
  assert.match(legacy,/Aides utilisées Canne simple/);
  assert.doesNotMatch(legacy,/Conditions historiques|Protocole : Adapté/);
- assert.doesNotMatch(legacy,/Risque de chute faible|Risque de chute modéré/);
+ assert.match(legacy,/Risque de chute modéré/);
+ assert.match(legacy,/Des adaptations sont consignées/);
 });
 test('5xSTS thresholds, adaptations, incomplete inputs and impossible or unperformed tests',()=>{
  const c=complete(),chair=c.chair;
@@ -143,7 +144,7 @@ test('clinical synthesis links objectives to evidence and defers conflicting fin
  assert.match(compactProject(c),/Renforcement.*extension de genou \(droite 3\/5\)/);
  c.mrc.cells.kneeExtR.value='';
  Object.assign(c.chair,{status:'Réalisé',time:'15,01',arms:'Non',humanAssistance:'Aucune',notes:'Fatigabilité au dernier lever.'});
- assert.match(compactDiagnosis(c),/Performance nettement diminuée.*limitation fonctionnelle/);
+ assert.match(compactDiagnosis(c),/Performance nettement ralentie.*limitation fonctionnelle/);
  assert.match(compactDiagnosis(c),/Fatigabilité au dernier lever/);
  assert.match(compactProject(c),/exercices de lever de chaise adaptés/);
  assert.doesNotMatch(compactDiagnosis(c),/déficit de force/);
@@ -158,7 +159,7 @@ test('clinical synthesis links objectives to evidence and defers conflicting fin
  c.tug.time='24';
  c.tug.details.observations=['Petits pas','Difficulté au demi-tour','Instabilité'];
  const diagnostic=compactDiagnosis(c);
- assert.match(diagnostic,/Tinetti : 0\/28 — Risque de chute élevé/);
+ assert.match(diagnostic,/Tinetti : 0\/28 — Risque de chute très élevé/);
  assert.match(diagnostic,/TUG : 24 secondes — Risque de chute élevé/);
  assert.match(diagnostic,/petits pas, difficulté au demi-tour/);
  assert.match(compactProject(c),/prévention des chutes/);
@@ -294,7 +295,7 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   const oldExport=await call('/'+old.id+'/export',{body:exportBody});
   assert.equal(oldExport.status,200);
   assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
-  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,5);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,6);
   const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
   assert.equal(originalComparison.status,200);
   const purge='/'+old.id+'/purge',valid={revision:1,confirmation:'effacer'};
@@ -375,7 +376,9 @@ test('walking distance persists as a bounded description and an open-ended measu
  const record={date:'2026-11-12',type:'initial',practitioner:'Amélie',clinical:c,project:'Projet fictif.'};
  let pdfAvailable=true;
  for(const [distance,expected,meters] of [
-  ['25 m','évalué à 25 mètres',25],['100 m','évalué à 100 mètres',100],['> 100 m','supérieur à 100 mètres',null]
+  ['25','évalué à 25 mètres',25],['25 m','évalué à 25 mètres',25],
+  ['100','évalué à 100 mètres',100],['100 m','évalué à 100 mètres',100],
+  ...['>100','> 100','>100 m','> 100 m'].map(value=>[value,'supérieur à 100 mètres',null])
  ]){
   c.walk.distance=distance;
   assert.equal(walkingPerimeter(distance).meters,meters);
@@ -414,13 +417,13 @@ test('diagnosis carries both indicative levels and uses the actual Tinetti subsc
  const diagnosis=compactDiagnosis(c);
  assert.ok(diagnosis.startsWith('Motif de prise en charge : '+c.reason+'\n\nObservations complémentaires de l’anamnèse : '+c.observations));
  assert.match(diagnosis,/Tinetti : 24\/28 — Risque de chute modéré/);
- assert.match(diagnosis,/certaines capacités de marche \(équilibre 16\/16, marche 8\/12\)/);
+ assert.match(diagnosis,/certaines difficultés de marche.*Équilibre : 16\/16. Marche : 8\/12/);
  assert.match(diagnosis,/TUG : 12 secondes — Risque de chute modéré/);
  assert.equal(diagnosis.match(/vigilance adaptée/g).length,1);
  assert.doesNotMatch(diagnosis,/fauteuil roulant|protocole|aucune classification/i);
  c.walk.wheelchair='Oui';
  assert.match(compactDiagnosis(c),/Marche possible\.[\s\S]*Utilisation habituelle d’un fauteuil roulant/);
- for(const [time,risk,detail] of [['11','faible','relativement préservée'],['24','élevé','nettement ralentie'],['30','très élevé','fortement altérée']]){
+ for(const [time,risk,detail] of [['11','faible','relativement préservée'],['24','élevé','ralentissement important'],['30','très élevé','fortement ralentie']]){
   c.tug.time=time;
   const result=compactDiagnosis(c);
   assert.ok(result.includes('TUG : '+time+' secondes — Risque de chute '+risk+'.'));
@@ -431,4 +434,37 @@ test('diagnosis carries both indicative levels and uses the actual Tinetti subsc
  c.tug.status='Non réalisable';
  c.tug.time='';
  assert.doesNotMatch(compactDiagnosis(c),/Risque de chute/);
+});
+
+test('moderate Tinetti and TUG, plus a 19-second 5xSTS, agree in the proposal and PDF',t=>{
+ const c=complete();
+ Object.assign(c.tinetti,{status:'Réalisé',protocol:'Adapté'});
+ for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);
+ c.tinetti.items.path='0';
+ c.tinetti.items.trunk='0';
+ Object.assign(c.tug,{status:'Réalisé',time:'12'});
+ Object.assign(c.chair,{status:'Réalisé',time:'19',arms:'Non',humanAssistance:'Aucune'});
+ assert.equal(compactTinetti(c).interpretation,'Risque de chute modéré');
+ assert.equal(tugRisk(c.tug),'Risque de chute modéré');
+ assert.equal(chairResult(c.chair).messages[0],'Performance nettement ralentie');
+ const diagnosis=compactDiagnosis(c);
+ assert.match(diagnosis,/Tinetti : 24\/28 — Risque de chute modéré/);
+ assert.match(diagnosis,/TUG : 12 secondes — Risque de chute modéré/);
+ assert.match(diagnosis,/5xSTS : 19 secondes — Performance nettement ralentie/);
+ assert.doesNotMatch(diagnosis,/Score descriptif|protocole standard|aucune classification/i);
+ const record={date:'2026-11-12',type:'initial',practitioner:'Amélie',clinical:c,diagnosis,project:'Projet fictif.'};
+ const extract=source=>spawnSync('pdftotext',['-','-'],{input:assessmentPDF(source),encoding:'utf8'});
+ const pdf=extract(record);
+ if(pdf.error?.code==='ENOENT'){t.skip('pdftotext indisponible');return;}
+ assert.equal(pdf.status,0,pdf.stderr);
+ const content=pdf.stdout.replace(/\s+/g,' ');
+ assert.match(content,/Total 24\/28 Interprétation Risque de chute modéré/);
+ assert.match(content,/Temps 12 secondes Interprétation Risque de chute modéré/);
+ assert.match(content,/Temps 19 secondes.*Interprétation Performance nettement ralentie/);
+ assert.doesNotMatch(content,/Score descriptif|protocole standard|aucune classification/i);
+ const historical='Texte précédemment validé, conservé exactement.';
+ const archived=extract({...record,diagnosis:historical});
+ assert.equal(archived.status,0,archived.stderr);
+ assert.match(archived.stdout.replace(/\s+/g,' '),/03 — Diagnostic kinésithérapique Texte précédemment validé, conservé exactement\./);
+ assert.equal(record.diagnosis,diagnosis);
 });

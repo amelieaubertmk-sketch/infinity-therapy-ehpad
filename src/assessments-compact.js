@@ -1,4 +1,5 @@
 // Compact assessment schema v2. Local deterministic rules; legacy documents are never converted.
+export const assessmentRulesVersion='2.6.2';
 export const muscleRows=[['pull','Traction','upper'],['push','Poussée','upper'],['grip','Préhension','upper'],['hip','Flexion de hanche','lower'],['kneeFlex','Flexion de genou','lower'],['kneeExt','Extension de genou','lower'],['ankleDorsi','Releveurs du pied','lower'],['anklePlantar','Flexion plantaire','lower']];
 export const assistanceOptions=['Aide humaine','Canne anglaise (béquille)','Canne simple','Canne tripode','Déambulateur 2 roues','Déambulateur 4 roues'];
 export const reasons=['Difficultés de compréhension ou d’exécution de la consigne','Douleur limitant l’évaluation','Fatigabilité','Refus du résident','Autre motif'];
@@ -35,7 +36,7 @@ export const tugObservations=['Instabilité','Difficulté au demi-tour','Petits 
 export const tugContext='Interprétation indicative à confronter à l’évaluation clinique globale du résident.';
 export const tugVigilance='À partir d’un risque modéré, une vigilance adaptée et une évaluation clinique globale sont recommandées.';
 export const tugPhysicalAssistance='Résultat chronométrique à interpréter avec prudence en présence d’une assistance physique.';
-export const tugLegacyAdaptation='Passation adaptée — résultat descriptif.';
+export const tugLegacyAdaptation='Des adaptations sont consignées dans ce bilan historique. Interprétation à confronter aux conditions de mesure.';
 export function newTugDetails(){
  return {technicalAid:'',humanAssistance:'',sitToStand:'',observations:[],notes:''};
 }
@@ -69,7 +70,6 @@ export function chairResult(chair){
  if(status!=='Réalisé')return {level:'',messages};
  if(chair.arms==='Oui')messages.push('Test réalisé avec utilisation des bras — résultat descriptif, non directement comparable aux références standardisées');
  if(chair.humanAssistance==='Aide physique')messages.push('Test réalisé avec assistance physique — interprétation standardisée non applicable');
- if(chair.protocol==='Adapté'&&chair.humanAssistance===undefined&&!messages.length)messages.push('Passation adaptée — résultat descriptif');
  const seconds=decimalSeconds(chair.time);
  if(messages.length||seconds===null||chair.arms!=='Non'||!['Aucune','Simple surveillance'].includes(chair.humanAssistance))return {level:'',messages};
  const level=seconds<12?'satisfactory':seconds<=15?'slow':'verySlow';
@@ -104,7 +104,7 @@ function testSeconds(test,key){
 const riskLabels={low:'faible',moderate:'modéré',high:'élevé',veryHigh:'très élevé'};
 export function tugRiskLevel(tug){
  if(tug.status==='Non réalisable')return 'unavailable';
- if(tug.status!=='Réalisé'||!tug.details&&tug.protocol==='Adapté')return '';
+ if(tug.status!=='Réalisé')return '';
  const seconds=testSeconds(tug,'tug');
  return seconds===null?'':seconds<12?'low':seconds<20?'moderate':seconds<30?'high':'veryHigh';
 }
@@ -121,11 +121,11 @@ export function recordedTugDetails(tug){
  return details.filter(([,value])=>value);
 }
 export function tinettiRisk(total){
- const level=total<=18?'high':total<=24?'moderate':'low';
+ const level=total<=18?'veryHigh':total<=24?'moderate':'low';
  const descriptions={
   low:'Bon équilibre et bonne qualité de la marche.',
   moderate:'Troubles de l’équilibre ou de la marche.',
-  high:'Troubles importants de l’équilibre ou de la marche.'
+  veryHigh:'Troubles importants de l’équilibre ou de la marche.'
  };
  return {level,interpretation:'Risque de chute '+riskLabels[level],description:descriptions[level]};
 }
@@ -233,8 +233,9 @@ function clinicalEvidence(c){
  const has=id=>c.findings.includes(id);
  const scores=compactTinetti(c),tug=effectiveTug(c),chair=chairResult(c.chair);
  const pomaRisk=scores.total===null?'':scores.level;
- const tugLevel=tug.status==='Réalisé'&&tug.details&&tug.details.humanAssistance!=='Aide physique'?tugRiskLevel(tug):'';
- const riskConflict=Boolean(pomaRisk&&tugLevel&&pomaRisk!==(tugLevel==='veryHigh'?'high':tugLevel));
+ const tugLevel=tug.status==='Réalisé'&&tug.details?.humanAssistance!=='Aide physique'?tugRiskLevel(tug):'';
+ const riskBand=level=>level==='veryHigh'?'high':level;
+ const riskConflict=Boolean(pomaRisk&&tugLevel&&riskBand(pomaRisk)!==riskBand(tugLevel));
  const tugSigns=observedGait(c,tug);
  const gait=new Set(tugSigns.filter(sign=>sign!=='Instabilité').map(sign=>sign.toLocaleLowerCase('fr-FR')));
  if(c.tinetti.status==='Réalisé'&&c.walk.possible!=='Impossible'){
@@ -274,20 +275,26 @@ const transferDisagreement='Les transferts renseignés sont autonomes et un cons
 const jointDisagreement='Le bilan articulaire est décrit comme normal et une limitation est signalée. Vérifier les données avant de cibler une articulation.';
 const vigilance=' Une vigilance adaptée est recommandée lors des déplacements.';
 const tugDiagnostic={
- low:'Ce temps traduit une mobilité fonctionnelle relativement préservée.',
- moderate:'Ce temps suggère une mobilité fonctionnelle légèrement diminuée.',
- high:'Ce temps traduit une mobilité fonctionnelle nettement ralentie.',
- veryHigh:'Ce temps traduit une mobilité fonctionnelle fortement altérée. Une surveillance et un accompagnement adaptés sont à envisager.'
+ low:'Cette performance traduit une mobilité fonctionnelle relativement préservée selon les repères retenus.',
+ moderate:'Cette performance suggère une mobilité fonctionnelle légèrement ralentie selon les repères retenus.',
+ high:'Le temps réalisé traduit un ralentissement important de la mobilité fonctionnelle, nécessitant une attention particulière lors des déplacements.',
+ veryHigh:'La réalisation du test est fortement ralentie, suggérant des limitations importantes de mobilité fonctionnelle.'
+};
+const chairDiagnostic={
+ satisfactory:' lors des passages assis-debout répétés.',
+ slow:' lors des passages assis-debout répétés, pouvant traduire une diminution des capacités fonctionnelles des membres inférieurs.',
+ verySlow:' lors des passages assis-debout répétés, suggérant une limitation fonctionnelle des membres inférieurs.'
 };
 function tinettiDiagnostic(scores){
  const {level,total,balance,gait,interpretation}=scores;
  const opening='Tinetti : '+total+'/28 — '+interpretation+'. ';
- if(level==='low')return opening+'La performance est globalement satisfaisante dans les épreuves d’équilibre et de marche.';
- const areas=[balance<16?'d’équilibre':'',gait<12?'de marche':''].filter(Boolean).join(' et ');
- const detail=' (équilibre '+balance+'/16, marche '+gait+'/12).';
- if(level==='moderate')return opening+'Le résultat suggère une altération de certaines capacités '+areas+detail+vigilance;
- return opening+'Le résultat met en évidence des difficultés importantes dans les épreuves '+areas+detail+
-  ' Une prise en charge ciblée '+(balance<16?'de l’équilibre':'de la marche')+' et de la sécurisation des déplacements est à envisager.';
+ if(level==='low')return opening+'Les performances aux épreuves d’équilibre et de marche sont globalement satisfaisantes.';
+ const balanceAffected=balance<16,gaitAffected=gait<12;
+ const area=balanceAffected&&gaitAffected?'d’équilibre et/ou de marche':balanceAffected?'d’équilibre':'de marche';
+ const detail=' Équilibre : '+balance+'/16. Marche : '+gait+'/12.';
+ if(level==='moderate')return opening+'Ce résultat suggère certaines difficultés '+area+', nécessitant une vigilance adaptée.'+detail;
+ return opening+'Ce résultat traduit des difficultés importantes dans les épreuves '+area+
+  ', justifiant une attention particulière à la sécurisation des déplacements et à la prévention des chutes.'+detail;
 }
 export function compactDiagnosis(c){
  validateCompact(c);
@@ -309,7 +316,8 @@ export function compactDiagnosis(c){
  if(e.tug.status==='Réalisé'&&testSeconds(e.tug,'tug')!==null){
   const time='TUG : '+e.tug.time+' secondes';
   if(tugLevel){
-   const caution=e.tug.details?.humanAssistance==='Aide physique'?' '+tugPhysicalAssistance:'';
+   const caution=e.tug.details?.humanAssistance==='Aide physique'?' '+tugPhysicalAssistance:
+    !e.tug.details&&e.tug.protocol==='Adapté'?' '+tugLegacyAdaptation:'';
    lines.push(time+' — '+tugRisk(e.tug)+'. '+tugDiagnostic[tugLevel]+(tugLevel==='moderate'&&e.pomaRisk!=='moderate'?vigilance:'')+caution);
   }else lines.push(time+'. Temps descriptif.');
  }
@@ -321,12 +329,11 @@ export function compactDiagnosis(c){
   lines.push('Observations d’équilibre et de marche : '+signs.join(', ')+'.');
  }
 
+ if(chairStatus(c.chair)==='Impossible')lines.push('5xSTS : test non évaluable.');
  if(c.chair.status==='Réalisé'){
-  const time=testSeconds(c.chair,'chair')!==null?c.chair.time+' secondes. ':'';
-  const slowed=e.chair.level==='slow'||e.chair.level==='verySlow';
-  const description=slowed?'Performance '+(e.chair.level==='verySlow'?'nettement ':'')+'diminuée lors des passages assis-debout répétés, suggérant une limitation fonctionnelle des membres inférieurs.':
-   e.chair.messages.filter(message=>message!==chairContext).join('. ');
-  if(time||description)lines.push('5xSTS : '+(time+description).trim());
+  const time=testSeconds(c.chair,'chair')===null?'':c.chair.time+' secondes';
+  const result=e.chair.level?e.chair.messages[0]+chairDiagnostic[e.chair.level]:e.chair.messages.join('. ');
+  if(time||result)lines.push('5xSTS : '+[time,result].filter(Boolean).join(' — '));
  }
  if(e.transfers.length)lines.push('Transferts : '+e.transfers.map(([id,value])=>transferLabels[id]+' ('+value.toLowerCase()+')').join(', ')+'.');
  if(e.transferConflict)lines.push(transferDisagreement);

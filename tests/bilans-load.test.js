@@ -30,3 +30,41 @@ test('diagnosis checks schema metadata in read-only mode without returning or mo
 });
 
 test('runtime manifest matches every shipped file and all source files pass syntax validation',async()=>{const result=await diagnoseBilans({project:root,manifest});assert.ok(result.checks.length>15);assert.ok(result.checks.every(c=>c.state==='target'),JSON.stringify(result.checks.filter(c=>c.state!=='target')));assert.ok(result.checks.every(c=>c.syntax===undefined||c.syntax==='valid'));});
+
+test('served files can match the updated checkout while the running API is still old',async()=>{
+ const directory=mkdtempSync(path.join(tmpdir(),'bilans-runtime-mismatch-'));
+ const dataDir=path.join(directory,'data');
+ let app;
+ try{
+  for(const file of ['package.json','server.js','index.html'])cpSync(path.join(root,file),path.join(directory,file));
+  for(const dir of ['backend','src','assets'])cpSync(path.join(root,dir),path.join(directory,dir),{recursive:true});
+  const backend=path.join(directory,'backend/server.js'),url=pathToFileURL(backend),official=readFileSync(backend,'utf8');
+  writeFileSync(backend,official.replace(/^.*route==='\/api\/assessment-runtime'.*$/m,''));
+  const {createApp:oldProcess}=await import(url.href);
+  app=oldProcess({directory:dataDir,origin:'http://localhost:3000'});
+  app.server.listen(0,'127.0.0.1');
+  await once(app.server,'listening');
+  writeFileSync(backend,official);
+  const before=app.db.prepare('SELECT * FROM state').get();
+  const diagnose=()=>diagnoseBilans({project:directory,base:'http://127.0.0.1:'+app.server.address().port,manifest,checkSyntax:false});
+  const stale=await diagnose();
+  assert.ok(stale.checks.every(check=>check.state==='target'));
+  assert.ok(stale.http.every(check=>check.matchesDisk));
+  assert.equal(stale.runtime.matches,false);
+  await new Promise(resolve=>app.server.close(resolve));
+  app.close();
+
+  const {createApp:newProcess}=await import(url.href+'?restart');
+  app=newProcess({directory:dataDir,origin:'http://localhost:3000'});
+  app.server.listen(0,'127.0.0.1');
+  await once(app.server,'listening');
+  const current=await diagnose();
+  assert.equal(current.runtime.matches,true);
+  assert.deepEqual(current.runtime.loaded,{api:manifest.release,rules:manifest.release,pdf:manifest.release});
+  assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),before);
+ }finally{
+  if(app?.server.listening)await new Promise(resolve=>app.server.close(resolve));
+  app?.close();
+  rmSync(directory,{recursive:true,force:true});
+ }
+});
