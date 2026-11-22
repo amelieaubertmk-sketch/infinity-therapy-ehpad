@@ -6,6 +6,13 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {planStaticRouteRepair} from './repair-static-routes.js';
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+function readJson(file,label){
+ const bytes=readFileSync(file);
+ const encoding=bytes[0]===0xff&&bytes[1]===0xfe?'utf-16le':
+  bytes[0]===0xfe&&bytes[1]===0xff?'utf-16be':'utf-8';
+ try{return JSON.parse(new TextDecoder(encoding,{fatal:true}).decode(bytes));}
+ catch{throw Error('JSON invalide dans '+label+'. Vérifier le fichier et son encodage.');}
+}
 const schema={state:['id','revision','data'],assessments:['id','resident_id','owner','status','revision','data'],assessment_tracking:['assessment_id','deleted_at','deleted_by','titan_at','titan_by','titan_name'],assessment_versions:['id','assessment_id','at','actor','data'],assessment_documents:['assessment_id','pdf','created_at','format_version']};
 export async function diagnoseBilans({project,base,manifest,checkSyntax=true,dataFile}){
  const root=realpathSync(project),result={project:root,node:process.version,checks:[],routes:null,http:[],schema:null,conclusions:[]};
@@ -55,5 +62,18 @@ export async function diagnoseBilans({project,base,manifest,checkSyntax=true,dat
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const args=process.argv.slice(2),arg=key=>args.includes(key)?args[args.indexOf(key)+1]:undefined;
- try{const configPath=arg('--config')||(process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'InfinityTherapyDemo','config.json'):null),config=configPath&&existsSync(configPath)?JSON.parse(readFileSync(configPath,'utf8')):{};const project=arg('--project')||config.project;if(!project)throw Error('Indiquer --project ou utiliser le compte Windows qui possède config.json.');const manifest=JSON.parse(readFileSync(arg('--manifest')||new URL('./bilans-runtime-manifest.json',import.meta.url),'utf8'));const result=await diagnoseBilans({project,base:arg('--base')||(config.port?'http://127.0.0.1:'+config.port:undefined),manifest,dataFile:args.includes('--schema')&&config.dataDir?path.join(config.dataDir,'demo.sqlite'):undefined});console.log(JSON.stringify(result,null,2));}catch(e){console.error(e.message);process.exitCode=1;}
+ try{
+  const explicitConfig=arg('--config'),projectArg=arg('--project'),baseArg=arg('--base'),checkSchema=args.includes('--schema');
+  const needsConfig=explicitConfig||!projectArg||!baseArg||checkSchema;
+  const configPath=explicitConfig||(process.env.LOCALAPPDATA?path.join(process.env.LOCALAPPDATA,'InfinityTherapyDemo','config.json'):null);
+  const config=needsConfig&&configPath&&existsSync(configPath)?readJson(configPath,'config.json'):{};
+  const project=projectArg||config.project;
+  if(!project)throw Error('Indiquer --project ou utiliser le compte Windows qui possède config.json.');
+  const manifest=readJson(arg('--manifest')||new URL('./bilans-runtime-manifest.json',import.meta.url),'le manifeste des bilans');
+  const result=await diagnoseBilans({
+   project,base:baseArg||(config.port?'http://127.0.0.1:'+config.port:undefined),manifest,
+   dataFile:checkSchema&&config.dataDir?path.join(config.dataDir,'demo.sqlite'):undefined
+  });
+  console.log(JSON.stringify(result,null,2));
+ }catch(e){console.error(e.message);process.exitCode=1;}
 }

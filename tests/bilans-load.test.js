@@ -7,6 +7,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {once} from 'node:events';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {createApp} from '../backend/server.js';
 import {diagnoseBilans} from '../scripts/diagnose-bilans.js';
 const root=fileURLToPath(new URL('../',import.meta.url)),hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -30,6 +31,38 @@ test('diagnosis checks schema metadata in read-only mode without returning or mo
 });
 
 test('runtime manifest matches every shipped file and all source files pass syntax validation',async()=>{const result=await diagnoseBilans({project:root,manifest});assert.ok(result.checks.length>15);assert.ok(result.checks.every(c=>c.state==='target'),JSON.stringify(result.checks.filter(c=>c.state!=='target')));assert.ok(result.checks.every(c=>c.syntax===undefined||c.syntax==='valid'));});
+
+test('diagnostic CLI reads PowerShell JSON encodings and skips redundant automatic configuration',()=>{
+ const directory=mkdtempSync(path.join(tmpdir(),'bilans-windows-json-'));
+ const configDir=path.join(directory,'InfinityTherapyDemo'),configPath=path.join(configDir,'config.json');
+ const manifestPath=path.join(directory,'manifest.json');
+ const run=(...args)=>spawnSync(process.execPath,[path.join(root,'scripts/diagnose-bilans.js'),'--manifest',manifestPath,...args],{
+  env:{...process.env,LOCALAPPDATA:directory},encoding:'utf8'
+ });
+ try{
+  mkdirSync(configDir);
+  writeFileSync(manifestPath,'\uFEFF'+JSON.stringify({files:{}}));
+  const config=JSON.stringify({project:root});
+  for(const bytes of [
+   Buffer.from('\uFEFF'+config,'utf8'),
+   Buffer.from('\uFEFF'+config,'utf16le'),
+   Buffer.from('\uFEFF'+config,'utf16le').swap16()
+  ]){
+   writeFileSync(configPath,bytes);
+   const result=run();
+   assert.equal(result.status,0,result.stderr);
+   assert.equal(JSON.parse(result.stdout).project,root.replace(/[\\/]$/,''));
+   assert.deepEqual(readFileSync(configPath),bytes);
+  }
+  writeFileSync(configPath,'INVALID_PRIVATE_TEST_JSON');
+  const explicit=run('--project',root,'--base','http://127.0.0.1:1');
+  assert.equal(explicit.status,0,explicit.stderr);
+  const invalid=run();
+  assert.equal(invalid.status,1);
+  assert.match(invalid.stderr,/JSON invalide dans config\.json/);
+  assert.doesNotMatch(invalid.stderr,/INVALID_PRIVATE_TEST_JSON/);
+ }finally{rmSync(directory,{recursive:true,force:true});}
+});
 
 test('served files can match the updated checkout while the running API is still old',async()=>{
  const directory=mkdtempSync(path.join(tmpdir(),'bilans-runtime-mismatch-'));
