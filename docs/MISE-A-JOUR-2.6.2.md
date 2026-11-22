@@ -14,7 +14,7 @@ Le serveur Node charge les règles des bilans au démarrage et lit les fichiers 
 
 4. Attendre **Infinity Therapy 2.6.2 vérifiée**. Le contrôle couvre la réponse du serveur après redémarrage et le contenu des modules JavaScript servis. Ouvrir votre adresse habituelle, actualiser la page et vérifier **Version 2.6.2** en bas de page.
 
-Si le script indique que le port est toujours occupé, fermer le serveur Infinity Therapy éventuellement lancé à la main puis relancer la mise à jour. En cas d’échec après la copie du code, lire le chemin de sauvegarde affiché avant de relancer la tâche. Le répertoire `code` de la sauvegarde contient les versions précédentes des fichiers remplacés. La mise à jour utilise la base et la configuration existantes.
+Le script reconnaît la tâche qui lance `start-windows.ps1` ainsi que la variante PowerShell `-EncodedCommand` qui charge le même `config.json` et démarre `server.js`. Si le script indique que le port est toujours occupé, fermer le serveur Infinity Therapy éventuellement lancé à la main puis relancer la mise à jour. En cas d’échec après la copie du code, lire le chemin de sauvegarde affiché avant de relancer la tâche. Le répertoire `code` de la sauvegarde contient les versions précédentes des fichiers remplacés. La mise à jour utilise la base et la configuration existantes.
 
 Pour une installation lancée à la main, arrêter le serveur, appliquer le remplacement du code dans le dossier `project`, puis relancer avec le même dossier de données. Depuis l’archive extraite, le diagnostic suivant lit les chemins configurés et vérifie la version servie, sans ouvrir la base de données.
 

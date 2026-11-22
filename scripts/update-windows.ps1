@@ -25,12 +25,35 @@ $accountSid = if ($account -match '^S-1-') { $account } else {
   (New-Object Security.Principal.NTAccount($account)).Translate([Security.Principal.SecurityIdentifier]).Value
 }
 if ($identity.User.Value -ne $accountSid) { throw 'Ouvrir PowerShell avec le compte Windows de la tache existante.' }
-if ($task.Actions.Count -ne 1 -or $task.Actions[0].Arguments -notmatch '(?i)-File\s+"([^"]+start-windows\.ps1)"\s*$') {
-  throw 'La tache ne lance pas le script standard. Verifier le demarrage existant avant la mise a jour.'
+if ($task.Actions.Count -ne 1 -or $task.Actions[0].Execute -notmatch '(?i)(?:^|[\\/])(?:powershell|pwsh)(?:\.exe)?$') {
+  throw 'La tache doit avoir une seule action PowerShell. Verifier le demarrage existant avant la mise a jour.'
 }
-$startup = Get-Content -LiteralPath $Matches[1] -Raw
-if (!$startup.Contains('$config.project') -or !$startup.Contains('$config.node server.js') -or !$startup.Contains('InfinityTherapyDemo\config.json')) {
-  throw 'Le script de demarrage ne charge pas le projet de config.json. Mise a jour interrompue.'
+$arguments = $task.Actions[0].Arguments
+if ($arguments -match '(?i)(?:^|\s)-File\s+"([^"]+start-windows\.ps1)"\s*$') {
+  $startup = Get-Content -LiteralPath $Matches[1] -Raw
+  if (!$startup.Contains('$config.project') -or !$startup.Contains('$config.node server.js') -or !$startup.Contains('InfinityTherapyDemo\config.json')) {
+    throw 'Le script de demarrage ne charge pas le projet de config.json. Mise a jour interrompue.'
+  }
+} elseif ($arguments -match '(?i)^\s*(?:(?:-NoProfile|-NonInteractive)\s+)*-EncodedCommand\s+(?<quote>"?)(?<payload>[A-Za-z0-9+/]+={0,2})\k<quote>\s*$') {
+  try { $startup = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches['payload'])) }
+  catch { throw 'La commande encodee de la tache ne peut pas etre lue. Mise a jour interrompue.' }
+  $expectedStartup = @'
+$ErrorActionPreference = 'Stop'
+$config = Get-Content "$env:LOCALAPPDATA\InfinityTherapyDemo\config.json" -Raw | ConvertFrom-Json
+$env:INFINITY_DATA_DIR = $config.dataDir
+$env:INFINITY_ORIGIN = $config.origin
+$env:PORT = [string]$config.port
+Set-Location $config.project
+& $config.node server.js
+exit $LASTEXITCODE
+'@
+  # Compare text only. The decoded command is never evaluated by this updater.
+  $normalized = ($startup -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join "`n"
+  if ($normalized -ne ($expectedStartup -replace '\r\n', "`n")) {
+    throw 'La commande encodee ne correspond pas au lanceur Infinity Therapy qui utilise config.json. Mise a jour interrompue.'
+  }
+} else {
+  throw 'Le mode de demarrage PowerShell de la tache est inconnu. Mise a jour interrompue.'
 }
 
 $files = @($manifest.files.PSObject.Properties)
