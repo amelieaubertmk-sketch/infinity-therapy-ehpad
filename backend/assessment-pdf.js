@@ -1,5 +1,5 @@
 import {walkingFields,anamnesisFields,jointFields,testDefinitions,testResult,tinettiScores,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,findingOptions,effectiveAids,effectiveTug,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
+import {muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
  recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 
@@ -184,7 +184,8 @@ function compactSections(c,{section,paragraph,table}){
  const subsection=(title,rows,column='Élément',showHeader=false)=>section(title,[table([column,'Résultat'],rows,undefined,showHeader)]);
  const history=note=>paragraph(note,{justify:true});
  const context=section('01 — Anamnèse et contexte clinique',[
-  c.reason.trim()&&history('Motif : '+c.reason),c.observationsEnabled&&history(c.observations)
+  c.reason.trim()&&history('Motif de prise en charge : '+c.reason),
+  c.observationsEnabled&&c.observations.trim()&&history('Observations complémentaires : '+c.observations)
  ],true);
  const mrc=[];
  if(c.mrc.status==='Non réalisable'){
@@ -203,7 +204,7 @@ function compactSections(c,{section,paragraph,table}){
  const walk=[
   ['Possibilité de marche',c.walk.possible],
   ['Aide utilisée',c.walk.possible==='Possible'?effectiveAids(c).join(', '):''],
-  ['Périmètre',c.walk.possible==='Possible'&&c.walk.distance!==''?c.walk.distance+' m':''],
+  ['Périmètre de marche',c.walk.possible==='Possible'?walkingPerimeter(c.walk.distance,{legacy:true})?.description:''],
   ['Fauteuil roulant habituel',c.walk.wheelchair]
  ];
  const tinetti=[],test=c.tinetti,status=tinettiStatus(test),scores=compactTinetti(c);
@@ -221,7 +222,7 @@ function compactSections(c,{section,paragraph,table}){
  if(scores.description)tinetti.push(['Description clinique',scores.description+'\n'+tinettiContext]);
  for(const [key,label] of tinettiFields)tinetti.push([label,test.details?.[key]]);
  if(test.details?.humanAssistance==='Aide physique')tinetti.push(['Précaution',tinettiAssistanceWarning]);
- if(!test.details&&status==='Réalisé'&&test.aidsOverride)tinetti.push(['Aides utilisées',effectiveAids(c,test).join(', ')]);
+ if(!test.details&&status==='Réalisé'&&test.aidsOverride&&Array.isArray(test.aids))tinetti.push(['Aides utilisées',effectiveAids(c,test).join(', ')]);
  tinetti.push(['Observations complémentaires',test.details?.notes]);
  const tug=effectiveTug(c),tugRows=[];
  if(tug.status==='Réalisé'){

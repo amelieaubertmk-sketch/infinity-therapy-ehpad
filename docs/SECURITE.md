@@ -45,3 +45,9 @@ Les données fictives de soins sont partagées avec les trois rôles autorisés 
 7. Créer un environnement de production réellement séparé, avec ses propres comptes, clés, stockage et procédures ; aucune réutilisation aveugle de la base ou des mots de passe fictifs.
 
 Aucune de ces validations organisationnelles, juridiques ou de conformité n’est acquise par la présente implémentation.
+
+## Suppression des bilans et rétention des sauvegardes
+
+La suppression définitive efface le bilan sélectionné, ses versions, son suivi et ses PDF de la base active. Les sauvegardes produites avant cette suppression, les PDF téléchargés et les copies présentes dans Titan sont gérés séparément.
+
+Le responsable des dossiers fixe et documente une durée de conservation, un emplacement protégé et un calendrier de purge conformes aux obligations de l’établissement. À chaque échéance, il vérifie les obligations de conservation ou de gel applicables, retire les copies arrivées à terme et consigne la date de purge. Le script de sauvegarde crée une copie SQLite cohérente et laisse cette rétention sous le contrôle de l’établissement. Après une restauration, rapprocher la sauvegarde des suppressions effectuées depuis sa création avant de remettre la base en service.

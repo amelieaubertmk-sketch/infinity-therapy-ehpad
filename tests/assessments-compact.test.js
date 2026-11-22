@@ -10,7 +10,7 @@ import {createApp} from '../backend/server.js';
 import {newSession} from '../backend/auth.js';
 import {seed,createTransmission} from '../src/domain.js';
 import {emptyClinical,comparison} from '../src/assessments-domain.js';
-import {newCompactClinical,validateCompact,compactTinetti,compactDiagnosis,compactProject,effectiveTug,effectiveAids,muscleRows,pomaItems,tugRisk,recordedTugDetails,chairResult} from '../src/assessments-compact.js';
+import {newCompactClinical,validateCompact,compactTinetti,compactDiagnosis,compactProject,effectiveTug,effectiveAids,muscleRows,pomaItems,tugRisk,recordedTugDetails,chairResult,walkingPerimeter} from '../src/assessments-compact.js';
 import {assessmentPDF} from '../backend/assessment-pdf.js';
 const complete=()=>{const c=newCompactClinical();c.reason='Évaluation fonctionnelle fictive';c.mrc.status='Réalisable';c.walk.possible='Possible';for(const key of ['tug','tinetti','chair']){c[key].status='Non réalisable';c[key].reason='Refus du résident';}return c;};
 test('compact defaults, MRC 0/NE/missing, partial results and conditional fields',()=>{
@@ -158,9 +158,8 @@ test('clinical synthesis links objectives to evidence and defers conflicting fin
  c.tug.time='24';
  c.tug.details.observations=['Petits pas','Difficulté au demi-tour','Instabilité'];
  const diagnostic=compactDiagnosis(c);
- assert.match(diagnostic,/risque de chute élevé/);
- assert.equal(diagnostic.match(/risque de chute élevé/g).length,1);
- assert.match(diagnostic,/concordant avec le Tinetti/);
+ assert.match(diagnostic,/Tinetti : 0\/28 — Risque de chute élevé/);
+ assert.match(diagnostic,/TUG : 24 secondes — Risque de chute élevé/);
  assert.match(diagnostic,/petits pas, difficulté au demi-tour/);
  assert.match(compactProject(c),/prévention des chutes/);
  assert.match(compactProject(c),/Difficultés à cibler : petits pas, difficulté au demi-tour/);
@@ -283,10 +282,10 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   app.db.prepare('INSERT INTO assessment_tracking(assessment_id,titan_at,titan_by,titan_name) VALUES(?,?,?,?)').run(old.id,stamp,'owner','Owner');
   app.server.listen(0,'127.0.0.1');
   await once(app.server,'listening');
-  const call=async(suffix,{actor='owner',body,csrf=true}={})=>{
+  const call=async(suffix,{actor='owner',body,csrf=true,method=body?'POST':'GET'}={})=>{
    const session=sessions[actor];
    const response=await fetch('http://127.0.0.1:'+app.server.address().port+'/api/assessments'+suffix,{
-    method:body?'POST':'GET',headers:{Origin:origin,'Content-Type':'application/json',Cookie:'infinity_session='+session.token,
+    method,headers:{Origin:origin,'Content-Type':'application/json',Cookie:'infinity_session='+session.token,
      ...(csrf?{'X-CSRF-Token':session.csrf}:{})},body:body?JSON.stringify(body):undefined
    });
    return {status:response.status,data:await response.json()};
@@ -295,7 +294,7 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   const oldExport=await call('/'+old.id+'/export',{body:exportBody});
   assert.equal(oldExport.status,200);
   assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
-  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,4);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,5);
   const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
   assert.equal(originalComparison.status,200);
   const purge='/'+old.id+'/purge',valid={revision:1,confirmation:'effacer'};
@@ -305,6 +304,10 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   assert.equal((await call(purge,{body:{...valid,confirmation:'Effacer'}})).status,400);
   assert.equal((await call(purge,{body:{...valid,revision:2}})).status,409);
   assert.equal((await call('/'+old.id)).status,200);
+  const edit=await call('/'+old.id,{method:'PUT',body:{revision:1,assessment:old}});
+  assert.equal(edit.status,400);
+  assert.match(edit.data.error,/Bilan finalisé immuable/);
+  assert.equal((await call(purge,{method:'PUT',body:valid})).status,405);
   assert.deepEqual(await call(purge,{body:valid}),{status:200,data:{deletedId:old.id}});
   for(const [table,column] of [['assessments','id'],['assessment_tracking','assessment_id'],['assessment_versions','assessment_id'],['assessment_documents','assessment_id'],['audit','target']]){
    assert.equal(app.db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${column}=?`).get(old.id).n,0);
@@ -365,4 +368,67 @@ test('a partial Tinetti retains real points without reporting a final score in t
  assert.equal(compactTinetti(historical).level,'unavailable');
  validateCompact(historical,true);
  assert.deepEqual(historical,before);
+});
+
+test('walking distance persists as a bounded description and an open-ended measurement has no numeric delta',t=>{
+ const c=complete();
+ const record={date:'2026-11-12',type:'initial',practitioner:'Amélie',clinical:c,project:'Projet fictif.'};
+ let pdfAvailable=true;
+ for(const [distance,expected,meters] of [
+  ['25 m','évalué à 25 mètres',25],['100 m','évalué à 100 mètres',100],['> 100 m','supérieur à 100 mètres',null]
+ ]){
+  c.walk.distance=distance;
+  assert.equal(walkingPerimeter(distance).meters,meters);
+  validateCompact(c,true);
+  const diagnosis=compactDiagnosis(c);
+  assert.ok(diagnosis.includes('Périmètre de marche '+expected+'.'));
+  const pdf=spawnSync('pdftotext',['-','-'],{input:assessmentPDF({...record,diagnosis}),encoding:'utf8'});
+  if(pdf.error?.code==='ENOENT'){pdfAvailable=false;continue;}
+  assert.equal(pdf.status,0,pdf.stderr);
+  assert.ok(pdf.stdout.replace(/\s+/g,' ').includes('Périmètre de marche '+expected));
+ }
+ const previous=structuredClone(c);
+ previous.walk.distance='100 m';
+ const change=comparison(previous,c).find(row=>row.label==='Périmètre de marche');
+ assert.deepEqual(change,{label:'Périmètre de marche',previous:'100 m',current:'> 100 m',delta:'Non comparable'});
+ assert.equal(walkingPerimeter('25,5 m').meters,25.5);
+ assert.equal(walkingPerimeter('> 50 m'),null);
+ assert.equal(walkingPerimeter('-5 m'),null);
+ assert.doesNotThrow(()=>{previous.walk.distance='125';validateCompact(previous,true);},'Ancienne mesure exacte préservée');
+ if(!pdfAvailable)t.diagnostic('pdftotext indisponible : extraction PDF non vérifiée.');
+});
+
+test('diagnosis carries both indicative levels and uses the actual Tinetti subscores',()=>{
+ const c=complete();
+ c.observationsEnabled=true;
+ c.observations='Observation fictive à conserver.';
+ c.walk.possible='Possible';
+ c.walk.wheelchair='Non';
+ c.tinetti.status='Réalisé';
+ assert.equal(Object.hasOwn(c.tinetti,'protocol'),false);
+ for(const [id,,,values] of pomaItems)c.tinetti.items[id]=String(values.length-1);
+ c.tinetti.items.path='0';
+ c.tinetti.items.trunk='0';
+ c.tug.status='Réalisé';
+ c.tug.time='12';
+ const diagnosis=compactDiagnosis(c);
+ assert.ok(diagnosis.startsWith('Motif de prise en charge : '+c.reason+'\n\nObservations complémentaires de l’anamnèse : '+c.observations));
+ assert.match(diagnosis,/Tinetti : 24\/28 — Risque de chute modéré/);
+ assert.match(diagnosis,/certaines capacités de marche \(équilibre 16\/16, marche 8\/12\)/);
+ assert.match(diagnosis,/TUG : 12 secondes — Risque de chute modéré/);
+ assert.equal(diagnosis.match(/vigilance adaptée/g).length,1);
+ assert.doesNotMatch(diagnosis,/fauteuil roulant|protocole|aucune classification/i);
+ c.walk.wheelchair='Oui';
+ assert.match(compactDiagnosis(c),/Marche possible\.[\s\S]*Utilisation habituelle d’un fauteuil roulant/);
+ for(const [time,risk,detail] of [['11','faible','relativement préservée'],['24','élevé','nettement ralentie'],['30','très élevé','fortement altérée']]){
+  c.tug.time=time;
+  const result=compactDiagnosis(c);
+  assert.ok(result.includes('TUG : '+time+' secondes — Risque de chute '+risk+'.'));
+  assert.ok(result.includes(detail));
+  assert.match(result,/Les repères du Tinetti et du TUG diffèrent/);
+ }
+ c.tinetti.items.path='NE';
+ c.tug.status='Non réalisable';
+ c.tug.time='';
+ assert.doesNotMatch(compactDiagnosis(c),/Risque de chute/);
 });

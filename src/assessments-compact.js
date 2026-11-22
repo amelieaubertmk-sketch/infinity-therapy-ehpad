@@ -76,8 +76,19 @@ export function chairResult(chair){
  const label={satisfactory:'Performance fonctionnelle satisfaisante',slow:'Performance ralentie',verySlow:'Performance nettement ralentie'};
  return {level,messages:[label[level],chairContext]};
 }
-export function newCompactClinical(){return {schema:2,reason:'',observationsEnabled:false,observations:'',mrc:{status:'',reason:'',other:'',cells:Object.fromEntries(muscleRows.flatMap(([id])=>['R','L'].map(side=>[id+side,{value:'',reason:''}])) )},walk:{possible:'',aidEnabled:false,aids:[],distance:'',wheelchair:''},tug:{status:'',time:'',reason:'',aidsOverride:false,aids:[],aidsInitialized:false,protocol:'',conditions:'',details:newTugDetails()},tinetti:{status:'',reason:'',aidsOverride:false,aids:[],aidsInitialized:false,protocol:'',conditions:'',items:Object.fromEntries(pomaItems.map(([id])=>[id,''])),details:newTinettiDetails()},chair:{status:'',time:'',reason:'',arms:'',humanAssistance:'',notes:'',protocol:'',conditions:''},jointsEnabled:false,joints:'',transfers:{bedChair:'',sitStand:''},findings:[]};}
+export function newCompactClinical(){return {schema:2,reason:'',observationsEnabled:false,observations:'',mrc:{status:'',reason:'',other:'',cells:Object.fromEntries(muscleRows.flatMap(([id])=>['R','L'].map(side=>[id+side,{value:'',reason:''}])) )},walk:{possible:'',aidEnabled:false,aids:[],distance:'',wheelchair:''},tug:{status:'',time:'',reason:'',aidsOverride:false,aids:[],aidsInitialized:false,protocol:'',conditions:'',details:newTugDetails()},tinetti:{status:'',reason:'',items:Object.fromEntries(pomaItems.map(([id])=>[id,''])),details:newTinettiDetails()},chair:{status:'',time:'',reason:'',arms:'',humanAssistance:'',notes:'',protocol:'',conditions:''},jointsEnabled:false,joints:'',transfers:{bedChair:'',sitStand:''},findings:[]};}
 const isNumber=v=>typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0;
+export const walkingPerimeterError='Saisir un périmètre entre 0 et 100 m, ou « > 100 m ».';
+export function walkingPerimeter(value,{legacy=false}={}){
+ if(typeof value!=='string')return null;
+ const input=value.trim();
+ if(/^>\s*100\s*m?$/i.test(input))return {meters:null,label:'> 100 m',description:'supérieur à 100 mètres'};
+ const match=/^(\d+(?:[.,]\d+)?)\s*m?$/i.exec(input);
+ const meters=match?Number(match[1].replace(',','.')):legacy&&isNumber(value)?Number(value):NaN;
+ if(!Number.isFinite(meters))return null;
+ const number=(match?.[1]??value.trim()).replace('.',',');
+ return {meters,label:number+' m',description:'évalué à '+number+(meters===1?' mètre':' mètres')};
+}
 export function effectiveAids(c,test){return (test?.aidsOverride?[...test.aids]:c.walk.possible==='Possible'&&c.walk.aidEnabled?[...c.walk.aids]:[]).sort((a,b)=>assistanceOptions.indexOf(a)-assistanceOptions.indexOf(b));}
 export function effectiveTug(c){return c.walk.possible==='Impossible'?{...c.tug,status:'Non réalisable',reason:'Marche impossible',time:''}:c.tug;}
 export function decimalSeconds(value){
@@ -141,8 +152,21 @@ export function validateCompact(c,complete=false){
  const text=(v,max=10000)=>{if(typeof v!=='string'||v.length>max)throw Error('Champ clinique invalide.');};const choice=(v,values)=>{if(!values.includes(v))throw Error('Choix clinique invalide.');};const bool=v=>{if(typeof v!=='boolean')throw Error('Option clinique invalide.');};
  if(c?.schema!==2||!c.mrc?.cells||!c.walk||!c.tinetti?.items||!c.chair||!c.tug||!c.transfers)throw Error('Format clinique compact invalide.');text(c.reason);text(c.observations);text(c.joints);bool(c.observationsEnabled);bool(c.jointsEnabled);choice(c.mrc.status,['','Réalisable','Non réalisable']);text(c.mrc.reason);text(c.mrc.other);if(c.mrc.reason)choice(c.mrc.reason,reasons);
  for(const [id] of muscleRows)for(const side of ['R','L']){const cell=c.mrc.cells[id+side];if(!cell)throw Error('Cellule MRC absente.');choice(cell.value,['','0','1','2','3','4','5','NE']);choice(cell.reason,['',...reasons]);}
- choice(c.walk.possible,['','Possible','Impossible']);choice(c.walk.wheelchair,['','Oui','Non']);bool(c.walk.aidEnabled);text(c.walk.distance,30);if(c.walk.distance&&!isNumber(c.walk.distance))throw Error('Périmètre invalide.');const aids=a=>{if(!Array.isArray(a)||new Set(a).size!==a.length||a.some(v=>!assistanceOptions.includes(v)))throw Error('Aide de marche invalide.');};aids(c.walk.aids);
- for(const key of ['tug','tinetti','chair']){const t=c[key];const statuses=key==='chair'?chairStatuses.map(([status])=>status):key==='tinetti'?tinettiStatuses:['Réalisé'];choice(t.status,['','Non réalisable',...statuses]);text(t.reason);if(t.reason)choice(t.reason,[...reasons,'Marche impossible']);choice(t.protocol,['','Standard','Adapté']);text(t.conditions);if(key!=='chair'){bool(t.aidsOverride);aids(t.aids);}else choice(t.arms,['','Oui','Non']);if(key!=='tinetti'){text(t.time,30);if(t.time&&testSeconds(t,key)===null)throw Error('Temps invalide : une durée mesurée doit être positive.');}}
+ choice(c.walk.possible,['','Possible','Impossible']);choice(c.walk.wheelchair,['','Oui','Non']);bool(c.walk.aidEnabled);text(c.walk.distance,30);if(c.walk.distance&&!walkingPerimeter(c.walk.distance,{legacy:true}))throw Error(walkingPerimeterError);const aids=a=>{if(!Array.isArray(a)||new Set(a).size!==a.length||a.some(v=>!assistanceOptions.includes(v)))throw Error('Aide de marche invalide.');};aids(c.walk.aids);
+ for(const key of ['tug','tinetti','chair']){
+  const test=c[key];
+  const statuses=key==='chair'?chairStatuses.map(([status])=>status):key==='tinetti'?tinettiStatuses:['Réalisé'];
+  choice(test.status,['','Non réalisable',...statuses]);
+  text(test.reason);
+  if(test.reason)choice(test.reason,[...reasons,'Marche impossible']);
+  if(key==='tinetti')continue; // Historical protocol and conditions are optional archival data.
+  if(test.protocol!==undefined)choice(test.protocol,['','Standard','Adapté']);
+  if(test.conditions!==undefined)text(test.conditions);
+  if(key==='tug'){bool(test.aidsOverride);aids(test.aids);}
+  else choice(test.arms,['','Oui','Non']);
+  text(test.time,30);
+  if(test.time&&testSeconds(test,key)===null)throw Error('Temps invalide : une durée mesurée doit être positive.');
+ }
  if(Object.hasOwn(c.tug,'details')){
   const t=c.tug,d=t.details;
   if(!d||typeof d!=='object')throw Error('Détails du TUG invalides.');
@@ -164,7 +188,23 @@ export function validateCompact(c,complete=false){
   if(t.status!=='Réalisé'&&t.time)throw Error('Un temps de 5xSTS ne peut être enregistré que pour un test réalisé.');
  }
  for(const [id,,,options] of pomaItems)choice(c.tinetti.items[id],['','NE',...options.map((_,i)=>String(i))]);if(Object.keys(c.transfers).some(k=>!['bedChair','sitStand'].includes(k)))throw Error('Transfert non autorisé dans ce format.');for(const key of ['bedChair','sitStand'])choice(c.transfers[key],['','Autonome','Assistance partielle','Assistance totale']);if(!Array.isArray(c.findings)||new Set(c.findings).size!==c.findings.length||c.findings.some(id=>!findingOptions.some(f=>f[0]===id)))throw Error('Constat invalide.');
- if(complete){if(!c.reason.trim()||!c.mrc.status||!c.walk.possible)throw Error('Renseigner le motif, la réalisabilité du MRC et la marche.');if(c.mrc.status==='Non réalisable'&&!c.mrc.reason)throw Error('Préciser le motif du testing non réalisable.');if(c.mrc.status==='Non réalisable'&&c.mrc.reason==='Autre motif'&&!c.mrc.other.trim())throw Error('Préciser le motif du testing.');if(c.walk.possible==='Possible'&&c.walk.aidEnabled&&!c.walk.aids.length)throw Error('Choisir les aides utilisées ou décocher Aide à la marche.');for(const key of ['tug','tinetti','chair']){const t=key==='tug'?effectiveTug(c):c[key];if(!t.status)throw Error('Préciser la réalisation des tests fonctionnels.');if(key!=='tinetti'&&t.status==='Non réalisable'&&!t.reason&&!(key==='tug'&&t.details)&&!(key==='chair'&&t.humanAssistance!==undefined))throw Error('Préciser le motif du test non réalisable.');if(t.status==='Réalisé'){if(key!=='tinetti'&&!t.protocol&&!(key==='tug'&&t.details)&&!(key==='chair'&&t.humanAssistance!==undefined))throw Error('Préciser le protocole standard ou adapté.');if(key!=='tinetti'&&testSeconds(t,key)===null&&!(key==='chair'&&t.humanAssistance==='Aide physique'))throw Error('Temps du test réalisé requis.');if(key==='tinetti'&&!pomaItems.some(([id,,group])=>(group!=='gait'||c.walk.possible!=='Impossible')&&t.items[id]!==''))throw Error('Renseigner un item du Tinetti ou indiquer que le test est impossible ou non réalisé.');if(key==='chair'&&t.humanAssistance===undefined&&!t.arms)throw Error('Préciser l’utilisation des bras.');}}}return c;
+ if(complete){
+  if(!c.reason.trim()||!c.mrc.status||!c.walk.possible)throw Error('Renseigner le motif, la réalisabilité du MRC et la marche.');
+  if(c.mrc.status==='Non réalisable'&&!c.mrc.reason)throw Error('Préciser le motif du testing non réalisable.');
+  if(c.mrc.status==='Non réalisable'&&c.mrc.reason==='Autre motif'&&!c.mrc.other.trim())throw Error('Préciser le motif du testing.');
+  if(c.walk.possible==='Possible'&&c.walk.aidEnabled&&!c.walk.aids.length)throw Error('Choisir les aides utilisées ou décocher Aide à la marche.');
+  const tug=effectiveTug(c),chair=c.chair;
+  if(![tug,c.tinetti,chair].every(test=>test.status))throw Error('Préciser la réalisation des tests fonctionnels.');
+  if(tug.status==='Non réalisable'&&!tug.reason&&!tug.details||
+     chair.status==='Non réalisable'&&!chair.reason&&chair.humanAssistance===undefined)throw Error('Préciser le motif du test non réalisable.');
+  if(tug.status==='Réalisé'&&testSeconds(tug,'tug')===null||
+     chair.status==='Réalisé'&&testSeconds(chair,'chair')===null&&chair.humanAssistance!=='Aide physique')throw Error('Temps du test réalisé requis.');
+  if(chair.status==='Réalisé'&&chair.humanAssistance===undefined&&!chair.arms)throw Error('Préciser l’utilisation des bras.');
+  if(c.tinetti.status==='Réalisé'&&!pomaItems.some(([id,,group])=>(group!=='gait'||c.walk.possible!=='Impossible')&&c.tinetti.items[id]!=='')){
+   throw Error('Renseigner un item du Tinetti ou indiquer que le test est impossible ou non réalisé.');
+  }
+ }
+ return c;
 }
 const transferLabels={bedChair:'lit-fauteuil',sitStand:'assis-debout'};
 const gaitObservations=[
@@ -221,9 +261,8 @@ function clinicalEvidence(c){
  const transferConflict=has('transfer')&&transfers.length>0&&assisted.length===0;
  return {has,scores,tug,chair,pomaRisk,tugLevel,riskConflict,walkConflict,gait:[...gait],balance,weak,transfers,assisted,transferConflict,joints:jointEvidence(c)};
 }
-function activeNotes(c){
+function testNotes(c){
  return [
-  ['Observations cliniques',c.observationsEnabled?c.observations:''],
   ['Observations du Tinetti',c.tinetti.details?.notes],
   ['Observations du TUG',c.tug.details?.notes],
   ['Observations du 5xSTS',c.chair.notes]
@@ -233,29 +272,48 @@ const riskDisagreement='Les repères du Tinetti et du TUG diffèrent. Les rappro
 const walkDisagreement='La marche est notée impossible alors que le bilan contient des observations de marche ou un résultat de test ambulatoire. Vérifier le contexte et la cohérence des saisies.';
 const transferDisagreement='Les transferts renseignés sont autonomes et un constat de difficulté est coché. Préciser le transfert et la difficulté observée avant de fixer un objectif.';
 const jointDisagreement='Le bilan articulaire est décrit comme normal et une limitation est signalée. Vérifier les données avant de cibler une articulation.';
+const vigilance=' Une vigilance adaptée est recommandée lors des déplacements.';
+const tugDiagnostic={
+ low:'Ce temps traduit une mobilité fonctionnelle relativement préservée.',
+ moderate:'Ce temps suggère une mobilité fonctionnelle légèrement diminuée.',
+ high:'Ce temps traduit une mobilité fonctionnelle nettement ralentie.',
+ veryHigh:'Ce temps traduit une mobilité fonctionnelle fortement altérée. Une surveillance et un accompagnement adaptés sont à envisager.'
+};
+function tinettiDiagnostic(scores){
+ const {level,total,balance,gait,interpretation}=scores;
+ const opening='Tinetti : '+total+'/28 — '+interpretation+'. ';
+ if(level==='low')return opening+'La performance est globalement satisfaisante dans les épreuves d’équilibre et de marche.';
+ const areas=[balance<16?'d’équilibre':'',gait<12?'de marche':''].filter(Boolean).join(' et ');
+ const detail=' (équilibre '+balance+'/16, marche '+gait+'/12).';
+ if(level==='moderate')return opening+'Le résultat suggère une altération de certaines capacités '+areas+detail+vigilance;
+ return opening+'Le résultat met en évidence des difficultés importantes dans les épreuves '+areas+detail+
+  ' Une prise en charge ciblée '+(balance<16?'de l’équilibre':'de la marche')+' et de la sécurisation des déplacements est à envisager.';
+}
 export function compactDiagnosis(c){
  validateCompact(c);
  const e=clinicalEvidence(c),lines=[];
- if(c.reason.trim())lines.push('Motif du bilan : '+c.reason.trim().replace(/[.!?]$/,'')+'.');
+ if(c.reason.trim())lines.push('Motif de prise en charge : '+c.reason);
+ if(c.observationsEnabled&&c.observations.trim())lines.push('Observations complémentaires de l’anamnèse : '+c.observations);
  if(e.walkConflict)lines.push(walkDisagreement);
  else if(c.walk.possible==='Impossible')lines.push('La marche n’est pas réalisable lors de cette évaluation.');
  if(c.walk.possible==='Possible'){
-  const aids=effectiveAids(c),context=[];
-  if(aids.length)context.push('aides renseignées : '+aids.join(', '));
-  if(isNumber(c.walk.distance))context.push('périmètre renseigné : '+c.walk.distance+' m');
-  if(c.walk.wheelchair)context.push('fauteuil roulant habituel : '+c.walk.wheelchair.toLowerCase());
-  lines.push('Marche possible'+(context.length?' ('+context.join(', ')+')':'')+'.');
- }else if(c.walk.wheelchair)lines.push('Fauteuil roulant habituel : '+c.walk.wheelchair.toLowerCase()+'.');
-
- if(e.pomaRisk==='high')lines.push('Le Tinetti ('+e.scores.total+'/28) indique une altération de l’équilibre et/ou de la qualité de la marche, associée à un risque de chute élevé dans cette grille.');
- else if(e.scores.total!==null)lines.push('Tinetti : '+e.scores.total+'/28.'+(e.pomaRisk?' Repère conventionnel de risque de chute '+riskLabels[e.pomaRisk]+'.':' Score descriptif.'));
- else if(c.tinetti.status==='Réalisé')lines.push('Tinetti partiel. Les items renseignés sont conservés.');
- if(e.tug.status==='Réalisé'&&testSeconds(e.tug,'tug')!==null){
-  const sameRisk=e.pomaRisk&&(e.pomaRisk===e.tugLevel||e.pomaRisk==='high'&&e.tugLevel==='veryHigh');
-  const context=e.tugLevel?(sameRisk?' Repère indicatif concordant avec le Tinetti.':' Repère indicatif de risque de chute '+riskLabels[e.tugLevel]+'.'):
-   e.tug.details?.humanAssistance==='Aide physique'?' Temps descriptif avec assistance physique.':' Temps descriptif.';
-  lines.push('TUG : '+e.tug.time+' secondes.'+context);
+  const aids=effectiveAids(c),perimeter=walkingPerimeter(c.walk.distance,{legacy:true});
+  lines.push(aids.length?'Marche possible avec '+aids.join(', ')+'.':'Marche possible.');
+  if(perimeter)lines.push('Périmètre de marche '+perimeter.description+'.');
  }
+ if(c.walk.wheelchair==='Oui')lines.push('Utilisation habituelle d’un fauteuil roulant.');
+
+ if(e.scores.total!==null)lines.push(tinettiDiagnostic(e.scores));
+ else if(c.tinetti.status==='Réalisé')lines.push('Tinetti : évaluation incomplète.');
+ const tugLevel=e.tug.status==='Réalisé'?tugRiskLevel(e.tug):'';
+ if(e.tug.status==='Réalisé'&&testSeconds(e.tug,'tug')!==null){
+  const time='TUG : '+e.tug.time+' secondes';
+  if(tugLevel){
+   const caution=e.tug.details?.humanAssistance==='Aide physique'?' '+tugPhysicalAssistance:'';
+   lines.push(time+' — '+tugRisk(e.tug)+'. '+tugDiagnostic[tugLevel]+(tugLevel==='moderate'&&e.pomaRisk!=='moderate'?vigilance:'')+caution);
+  }else lines.push(time+'. Temps descriptif.');
+ }
+ if(e.scores.total!==null||tugLevel)lines.push('Ces niveaux de risque sont des repères indicatifs à confronter à l’évaluation clinique globale.');
  if(e.riskConflict)lines.push(riskDisagreement);
  if(!e.walkConflict&&(e.gait.length||e.has('walking')||e.balance)){
   const signs=[...(e.balance?['instabilité ou trouble de l’équilibre documenté']:[]),...e.gait];
@@ -283,13 +341,13 @@ export function compactDiagnosis(c){
  if(e.has('instructions'))lines.push('Des difficultés de compréhension ou d’exécution des consignes sont observées, sans conclusion diagnostique médicale ou neuropsychologique.');
  const otherFindings=findingOptions.filter(([id])=>['distance','conditioning','pain','autonomy'].includes(id)&&e.has(id));
  if(otherFindings.length)lines.push('Autres constats : '+otherFindings.map(([,label])=>label.toLocaleLowerCase('fr-FR')).join(', ')+'.');
- for(const [label,note] of activeNotes(c))lines.push(label+' : '+note.trim());
+ for(const [label,note] of testNotes(c))lines.push(label+' : '+note.trim());
  return lines.join('\n\n')||'Les données disponibles ne permettent pas encore de proposer une synthèse fonctionnelle.';
 }
 export function compactProject(c){
  validateCompact(c);
  const e=clinicalEvidence(c),actions=[];
- const notes=[c.reason,e.joints.note,...activeNotes(c).map(([,note])=>note)].join(' ');
+ const notes=[c.reason,c.observationsEnabled?c.observations:'',e.joints.note,...testNotes(c).map(([,note])=>note)].join(' ');
  if(/contre[- ]?indiqu|contre[- ]?indication|interdit|sans appui|appui proscrit|ne pas mobiliser/i.test(notes))return 'Une précaution ou restriction explicite est mentionnée dans les textes actifs. Aucune intervention n’est proposée automatiquement. Définir les moyens compatibles après vérification clinique.';
  if(e.riskConflict)actions.push(riskDisagreement);
  if(e.walkConflict)actions.push(walkDisagreement);
@@ -321,4 +379,4 @@ export function compactProject(c){
  return actions.join('\n\n')||'Aucun objectif ciblé ne ressort des éléments documentés. Compléter les observations utiles avant de proposer des exercices.';
 }
 export function reviewLabel(record){if(record.clinical?.schema!==2)return record.reviewDate||'Non renseignée';return record.reviewWindow==='clinical'?'Selon l’évolution clinique, réévaluation anticipée si nécessaire':`Dans ${record.reviewWindow==='6m'?'6':'3'} mois, ou plus tôt selon l’évolution clinique`;}
-export function compactMeasurements(c){const rows=[];const add=(id,label,value,number=null,conditions='')=>rows.push({id,label,value,number,conditions});if(c.mrc.status==='Réalisable')for(const [id,label] of muscleRows)for(const side of ['R','L']){const x=c.mrc.cells[id+side];if(x.value)add(id+side,label+' '+(side==='R'?'droite':'gauche'),x.value==='NE'?'NE':x.value+'/5',/^[0-5]$/.test(x.value)?Number(x.value):null);}if(c.walk.possible==='Possible'&&isNumber(c.walk.distance))add('distance','Périmètre de marche',c.walk.distance+' m',Number(c.walk.distance),effectiveAids(c).join('|'));for(const [key,id,label] of [['tug','tug','Timed Up and Go'],['chair','fiveChair','Cinq levers de chaise']]){const t=key==='tug'?effectiveTug(c):c.chair;const seconds=testSeconds(t,key);if(t.status==='Réalisé'&&seconds!==null){const conditions=key==='tug'&&t.details?['tug',...tugFields.map(([field])=>t.details[field])]:key==='chair'&&t.humanAssistance!==undefined?['chair',t.arms,t.humanAssistance]:[t.protocol,t.conditions,key==='tug'?effectiveAids(c,t):t.arms];add(id,label,t.time+' s',seconds,JSON.stringify(conditions));}else if(t.status)add(id,label,key==='chair'?chairResult(t).messages[0]||chairStatus(t):t.reason?'Non réalisable : '+t.reason:'Non réalisable');}const p=compactTinetti(c);if(c.tinetti.status==='Réalisé')add('tinetti','Tinetti',p.total!==null?p.total+'/28':'Partiel',p.total,JSON.stringify(c.tinetti.details?['tinetti',...tinettiFields.map(([key])=>c.tinetti.details[key]),c.tinetti.protocol,c.tinetti.conditions]:[c.tinetti.protocol,c.tinetti.conditions,effectiveAids(c,c.tinetti)]));for(const [key,label,id] of [['bedChair','Lit-fauteuil','transfer'],['sitStand','Assis-debout','stand']])if(c.transfers[key])add(id,label,c.transfers[key]);return rows;}
+export function compactMeasurements(c){const rows=[];const add=(id,label,value,number=null,conditions='')=>rows.push({id,label,value,number,conditions});if(c.mrc.status==='Réalisable')for(const [id,label] of muscleRows)for(const side of ['R','L']){const x=c.mrc.cells[id+side];if(x.value)add(id+side,label+' '+(side==='R'?'droite':'gauche'),x.value==='NE'?'NE':x.value+'/5',/^[0-5]$/.test(x.value)?Number(x.value):null);}const perimeter=walkingPerimeter(c.walk.distance,{legacy:true});if(c.walk.possible==='Possible'&&perimeter)add('distance','Périmètre de marche',perimeter.label,perimeter.meters,effectiveAids(c).join('|'));for(const [key,id,label] of [['tug','tug','Timed Up and Go'],['chair','fiveChair','Cinq levers de chaise']]){const t=key==='tug'?effectiveTug(c):c.chair;const seconds=testSeconds(t,key);if(t.status==='Réalisé'&&seconds!==null){const conditions=key==='tug'&&t.details?['tug',...tugFields.map(([field])=>t.details[field])]:key==='chair'&&t.humanAssistance!==undefined?['chair',t.arms,t.humanAssistance]:[t.protocol,t.conditions,key==='tug'?effectiveAids(c,t):t.arms];add(id,label,t.time+' s',seconds,JSON.stringify(conditions));}else if(t.status)add(id,label,key==='chair'?chairResult(t).messages[0]||chairStatus(t):t.reason?'Non réalisable : '+t.reason:'Non réalisable');}const p=compactTinetti(c);if(c.tinetti.status==='Réalisé')add('tinetti','Tinetti',p.total!==null?p.total+'/28':'Partiel',p.total,JSON.stringify(c.tinetti.details?['tinetti',...tinettiFields.map(([key])=>c.tinetti.details[key]),c.tinetti.protocol,c.tinetti.conditions]:[c.tinetti.protocol,c.tinetti.conditions,effectiveAids(c,c.tinetti)]));for(const [key,label,id] of [['bedChair','Lit-fauteuil','transfer'],['sitStand','Assis-debout','stand']])if(c.transfers[key])add(id,label,c.transfers[key]);return rows;}
