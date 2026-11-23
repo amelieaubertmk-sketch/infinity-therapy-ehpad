@@ -5,8 +5,8 @@ import {emptyClinical,validateClinical,generateDiagnosis,generateProject} from '
 import {newCompactClinical,walkingPerimeter,walkingPerimeterError,assessmentRulesVersion} from '../src/assessments-compact.js';
 import {assessmentPDF,assessmentPdfVersion} from './assessment-pdf.js';
 import {technicalLog} from './log.js';
-export const assessmentRuntime=Object.freeze({api:'2.6.3',rules:assessmentRulesVersion,pdf:assessmentPdfVersion});
-const pdfFormatVersion=7;
+export const assessmentRuntime=Object.freeze({api:'2.6.4',rules:assessmentRulesVersion,pdf:assessmentPdfVersion});
+const pdfFormatVersion=8;
 export function initializeAssessments(db){db.exec(`CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,resident_id TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_tracking(assessment_id TEXT PRIMARY KEY,deleted_at TEXT,deleted_by TEXT,titan_at TEXT,titan_by TEXT,titan_name TEXT);
  CREATE TABLE IF NOT EXISTS assessment_versions(id INTEGER PRIMARY KEY,assessment_id TEXT NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,data TEXT NOT NULL);

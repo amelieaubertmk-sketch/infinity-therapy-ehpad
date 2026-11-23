@@ -1,5 +1,5 @@
 // Compact assessment schema v2. Local deterministic rules; legacy documents are never converted.
-export const assessmentRulesVersion='2.6.3';
+export const assessmentRulesVersion='2.6.4';
 export const muscleRows=[['pull','Traction','upper'],['push','Poussée','upper'],['grip','Préhension','upper'],['hip','Flexion de hanche','lower'],['kneeFlex','Flexion de genou','lower'],['kneeExt','Extension de genou','lower'],['ankleDorsi','Releveurs du pied','lower'],['anklePlantar','Flexion plantaire','lower']];
 export const assistanceOptions=['Aide humaine','Canne anglaise (béquille)','Canne simple','Canne tripode','Déambulateur 2 roues','Déambulateur 4 roues','Cadre de marche','Barres parallèles'];
 export const reasons=['Difficultés de compréhension ou d’exécution de la consigne','Douleur limitant l’évaluation','Fatigabilité','Refus du résident','Autre motif'];
@@ -325,21 +325,37 @@ function tinettiDiagnostic(scores){
  return opening+'Ce résultat traduit des difficultés importantes dans les épreuves '+area+
   ', justifiant une attention particulière à la sécurisation des déplacements et à la prévention des chutes.'+detail;
 }
+const riskNotice='Les niveaux de risque indiqués constituent des repères à interpréter au regard de l’évaluation clinique globale.';
+export function diagnosisPresentation(value){
+ const points=[];
+ let notice='';
+ for(const raw of String(value??'').split(/\r?\n/)){
+  const point=raw.trim().replace(/^(?:(?:[•*–-]|\d+[.)])(?:\s+|$))/,'');
+  if(!point)continue;
+  if(point.replace(/[’']/g,"'")===riskNotice.replace(/[’']/g,"'")){
+   notice=point;
+   continue;
+  }
+  const heading=point.match(/^(?:(?:Tinetti|TUG|5xSTS) : [^.]+?\.(?=\s|$)|[^:.]{1,72} :)/u)?.[0]||'';
+  points.push({heading,body:point.slice(heading.length).trim()});
+ }
+ return {points,notice};
+}
 export function compactDiagnosis(c){
  validateCompact(c);
  const e=clinicalEvidence(c),lines=[];
  if(c.reason.trim())lines.push('Motif de prise en charge : '+c.reason);
  if(c.observationsEnabled&&c.observations.trim())lines.push('Observations complémentaires de l’anamnèse : '+c.observations);
  if(e.walkConflict)lines.push(walkDisagreement);
- else if(c.walk.possible==='Impossible')lines.push('La marche n’est pas réalisable lors de cette évaluation.');
+ else if(c.walk.possible==='Impossible')lines.push('Marche : non réalisable lors de cette évaluation.');
  if(c.walk.possible==='Possible'){
   const aids=effectiveAids(c),perimeter=walkingPerimeter(c.walk.distance,{legacy:true});
-  if(aids.includes('Barres parallèles')){
-   lines.push('Marche possible entre les barres parallèles, dans un environnement sécurisé.');
-   const other=aids.filter(aid=>aid!=='Barres parallèles');
-   if(other.length)lines.push('Autres aides à la marche renseignées : '+other.join(', ')+'.');
-  }else lines.push(aids.length?'Marche possible avec '+aids.join(', ')+'.':'Marche possible.');
-  if(perimeter)lines.push('Périmètre de marche '+perimeter.description+'.');
+  const parallel=aids.includes('Barres parallèles');
+  const other=aids.filter(aid=>aid!=='Barres parallèles');
+  const ability=parallel?'possible entre les barres parallèles, dans un environnement sécurisé':other.length?'possible avec '+other.join(', '):'possible';
+  const details=[parallel&&other.length?'autres aides renseignées : '+other.join(', '):'',
+   perimeter?'périmètre de marche '+perimeter.description:''].filter(Boolean);
+  lines.push('Marche : '+[ability,...details].join(' ; ')+'.');
  }
  const stairs=stairsResults(c.walk.stairs);
  if(stairs.some(([label])=>label.endsWith('des escaliers'))){
@@ -355,8 +371,7 @@ export function compactDiagnosis(c){
  if(e.tug.status==='Réalisé'&&testSeconds(e.tug,'tug')!==null){
   const time='TUG : '+e.tug.time+' secondes';
   if(tugLevel){
-   const caution=e.tug.details?.humanAssistance==='Aide physique'?' '+tugPhysicalAssistance:
-    !e.tug.details&&e.tug.protocol==='Adapté'?' '+tugLegacyAdaptation:'';
+   const caution=e.tug.details?.humanAssistance==='Aide physique'?' '+tugPhysicalAssistance:'';
    lines.push(time+' — '+tugRisk(e.tug)+'. '+tugDiagnostic[tugLevel]+(tugLevel==='moderate'&&e.pomaRisk!=='moderate'?vigilance:'')+caution);
   }else lines.push(time+'. Temps descriptif.');
  }
@@ -387,8 +402,14 @@ export function compactDiagnosis(c){
  if(e.has('instructions'))lines.push('Des difficultés de compréhension ou d’exécution des consignes sont observées, sans conclusion diagnostique médicale ou neuropsychologique.');
  const otherFindings=findingOptions.filter(([id])=>['distance','conditioning','pain','autonomy'].includes(id)&&e.has(id));
  if(otherFindings.length)lines.push('Autres constats : '+otherFindings.map(([,label])=>label.toLocaleLowerCase('fr-FR')).join(', ')+'.');
- for(const [label,note] of testNotes(c))lines.push(label+' : '+note.trim());
- if(e.scores.total!==null||tugLevel)lines.push('Les niveaux de risque indiqués constituent des repères à interpréter au regard de l’évaluation clinique globale.');
+ for(const [label,note] of testNotes(c)){
+  const test=label.split(' ').at(-1);
+  const point=lines.findIndex(line=>line.startsWith(test+' :'));
+  const observation=label+' : '+note.trim().replace(/\s*\r?\n\s*/g,' ');
+  if(point===-1)lines.push(observation);
+  else lines[point]=lines[point].trimEnd().replace(/([^.!?])$/,'$1.')+' '+observation;
+ }
+ if(e.scores.total!==null||tugLevel)lines.push(riskNotice);
  return lines.join('\n\n')||'Les données disponibles ne permettent pas encore de proposer une synthèse fonctionnelle.';
 }
 export function compactProject(c){

@@ -1,5 +1,5 @@
 {
-  "release": "2.6.3",
+  "release": "2.6.4",
   "base": "2.6.0",
   "files": {
     "server.js": {
@@ -7,15 +7,15 @@
       "base260": "49f6fbbf234a6fef13ef3174e4c2b7531c2aa8953d0ea8c8fc37beebb2fae3e2"
     },
     "index.html": {
-      "sha256": "d0132c82f791b942a1f885c3396959ac092983878fb21d6b3e89f8bb5929c4b2",
+      "sha256": "62c60329ea81d3879de288306ead58f6fa229285f8feff12e5b7eb402e77fb58",
       "base260": "23d7ed25ed84ad80e5de1587767174304402e3660ce53e3073cdf15911750b50"
     },
     "package.json": {
-      "sha256": "4944db52c49939eaff9027286fd835f83472f0244ba5e1a282e05d88e2100ffa",
+      "sha256": "c5060a826ef6403599154ccd6594d0aebaad9a083b3694fbdffc2fc80f658559",
       "base260": "46f00fe3daf650612e4434aeb01dbf4674efd66e0beb299f5c0939c9a14b7055"
     },
     "src/app.js": {
-      "sha256": "fd0d9449eb4578c18554dcdc9462f437e2e8d6634126f4103e583226cade9de4",
+      "sha256": "4587a081a2ee35997c4c7a7fa76fff5f4eb27a52bf40b17e4aa0d67840f4cca4",
       "base260": "2985871b64511c996b61c0de3f0aebcd568f036b9d726a3c7dafb4a5aa7e262d"
     },
     "src/domain.js": {
@@ -31,15 +31,15 @@
       "base260": "db789e4d9a9336cde5a7d75298cd69f4489896276299d46484d2d61340302c9f"
     },
     "src/assessments.js": {
-      "sha256": "f2b33149cde9360f541ef701036de07280eb2cf3745981a16c7a65ec2a13e42b",
+      "sha256": "cd010718eec69d4a70807eda6fc50e39e21b4245c73a07eb2bdbf0576d75dd24",
       "base260": "0e60b9f175986a320763c03702d24ad990f572088ff60fe93a2ccc385228c672"
     },
     "src/assessments-domain.js": {
-      "sha256": "3cfc18ded77d010a1ef0c5d9b70c6144de8f12f3c517848c60246d3746de320a",
+      "sha256": "2cacfa9aca1497683f980993e84c5088b6e3a2ba8c7d844d262c8a4dab521a62",
       "base260": "8c31dce20abc5dce2893d89c51127dd6a43ef168895e30810bc51205d9246712"
     },
     "src/assessments-compact.js": {
-      "sha256": "ee6da5b93c54b7a1e79bb334f644b89cd0c6f3f0a549dcc228c2760642662a7c",
+      "sha256": "1dbbd705b08be9ed1ebf8dbaffb09885bd02c702d895d40be5c18419006a4f70",
       "base260": "2264f6ca047e763540e7d603e846340df9907e638ad0bcb77a81d9f8c8031177"
     },
     "backend/server.js": {
@@ -47,11 +47,11 @@
       "base260": "c46c58842045c876a62fb7fceff6ecc692fb66f0cf36c8627cadc5e4bcb645a4"
     },
     "backend/assessments.js": {
-      "sha256": "8a90229f2b72504993450c53fc888b8945a7be338a0c0b16abf4f6e8e8ed911a",
+      "sha256": "53e3136321439ba733807099e96d1202ca7ed4776ae8f821bc8415a96c76b784",
       "base260": "276e29f2d691a515c57448701046a91488cbe83ca7b81ee50c467f3f534b7163"
     },
     "backend/assessment-pdf.js": {
-      "sha256": "7413f46a2cb4995a1038c86a13f5e3e50ecbc74f90ff2826901d4cafcab1f820",
+      "sha256": "58dbffb6faa8ce347bff4101a6d0c160dd58d44e76f525a43a8cb277aef61dac",
       "base260": "03f3a58eb215951f4b31968ddb3a948491f1dd8292284573b21548506c27474f"
     },
     "backend/pdf-font.js": {
@@ -87,7 +87,7 @@
       "base260": "a4c5bc453ca281d90ea079e596da7ae0dfeb5777497c29ec254e76d97ff6f890"
     },
     "src/style.css": {
-      "sha256": "ec8a26217d558037af99b9d75035819b3f7febc9a755b26c422160220ae95e05",
+      "sha256": "913068580c972293289275026e6678099379f0b904f9b06fddafe19b620ea092",
       "base260": "23f4a8f7b596e59e02a1106e65b19e5ad6a2b3fc5eb58418207dba809e2267b1"
     },
     "backend/topaze.js": {

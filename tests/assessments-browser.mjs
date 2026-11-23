@@ -236,7 +236,7 @@ try{
  assert.equal(Object.hasOwn(proposal.clinical.tinetti,'protocol'),false);
  assert.match(proposal.diagnosis,/^Motif de prise en charge : Rééducation fictive/);
  assert.ok(proposal.diagnosis.startsWith('Motif de prise en charge : '+reason+'\n\nObservations complémentaires de l’anamnèse : '+anamnese));
- assert.ok(proposal.diagnosis.includes('Périmètre de marche supérieur à 100 mètres.'));
+ assert.ok(proposal.diagnosis.includes('périmètre de marche supérieur à 100 mètres.'));
  assert.match(proposal.diagnosis,/Tinetti : 24\/28 — Risque de chute modéré/);
  assert.match(proposal.diagnosis,/TUG : 12 secondes — Risque de chute modéré/);
  assert.equal(proposal.diagnosis.match(/vigilance adaptée/g).length,1);
@@ -251,7 +251,7 @@ try{
  await wheelchair.selectOption('Oui');
  const withWheelchair=await write('',()=>page.locator('#assessment-generate').click());
  assert.match(withWheelchair.diagnosis,/Utilisation habituelle d’un fauteuil roulant\./);
- assert.match(withWheelchair.diagnosis,/Marche possible entre les barres parallèles/);
+ assert.match(withWheelchair.diagnosis,/Marche : possible entre les barres parallèles/);
  assert.match(withWheelchair.diagnosis,/Descente des escaliers impossible/);
  assert.match(withWheelchair.diagnosis,/sans conclusion diagnostique médicale/);
  assert.match(withWheelchair.diagnosis,/Tinetti : 11\/28 — Risque de chute très élevé/);
@@ -260,7 +260,16 @@ try{
  assert.doesNotMatch(withWheelchair.diagnosis,/Score descriptif|protocole standard|aucune classification/i);
  const manual=withWheelchair.diagnosis+'\n\nNote manuelle validée.';
  const manualProject='Objectif validé : progresser lors des levers de chaise.';
+ const diagnosticPreview=page.locator('#assessment-diagnosis-preview');
+ const assertDiagnosisList=async()=>{
+  for(const heading of ['Motif de prise en charge :','Marche :','Tinetti : 11/28','TUG : 35 secondes','5xSTS : 19 secondes','Transferts :']){
+   assert.equal((await diagnosticPreview.locator('li strong').allTextContents()).filter(text=>text.startsWith(heading)).length,1,heading);
+  }
+  assert.equal(await diagnosticPreview.locator(':scope > p').filter({hasText:'Les niveaux de risque indiqués'}).count(),1);
+ };
+ await assertDiagnosisList();
  await field('diagnosis').fill(manual);
+ assert.equal(await diagnosticPreview.locator('li').filter({hasText:'Note manuelle validée.'}).count(),1);
  await field('project').fill(manualProject);
  await distance.fill('100 m');
  assert.equal(await field('diagnosis').inputValue(),manual);
@@ -327,12 +336,15 @@ try{
  await field('clinical.walk.stairs.down.status').selectOption('Possible');
  await page.getByText('Aides nécessaires à la descente',{exact:false}).click();
  await page.locator('[data-stairs-aid="down"][value="Aide humaine"]').check();
+ const correctedManual=manual+'\nCorrection manuelle après finalisation.';
+ await field('diagnosis').fill(correctedManual);
  await page.locator('#assessment-reviewed').check();
  const corrected=await write('/correct',()=>page.getByRole('button',{name:'Enregistrer les corrections'}).click());
  assert.equal(corrected.id,initial.id);
  assert.equal(corrected.status,'final');
  assert.equal(corrected.date,initial.date);
- assert.equal(corrected.diagnosis,manual);
+ assert.equal(corrected.diagnosis,correctedManual);
+ await assertDiagnosisList();
  assert.deepEqual(corrected.clinical.walk.stairs.down.aids,['Aide humaine']);
  assert.equal(corrected.topazConfirmedAt,tracked.topazConfirmedAt);
  assert.equal(app.db.prepare('SELECT 1 FROM assessment_documents WHERE assessment_id=?').get(initial.id),undefined);
@@ -344,6 +356,7 @@ try{
  await (await correctedPDF).saveAs(correctedFile);
  const revised=spawnSync('pdftotext',[correctedFile,'-'],{encoding:'utf8'}).stdout.replace(/\s+/g,' ');
  assert.match(revised,/Total 10\/28/);
+ assert.match(revised,/• Correction manuelle après finalisation\./);
  assert.match(revised,/Descente des escaliers possible — Aide humaine/);
  await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();
  await page.getByRole('button',{name:'Modifier le bilan'}).click();
@@ -357,7 +370,7 @@ try{
  const abandoned=await create('2026-11-13');await field('clinical.reason').fill('Brouillon abandonné, données fictives');await write('',()=>page.locator('#assessment-save').click());accept=false;await page.locator('#assessment-trash').click();assert.ok(await page.locator('#assessment-trash').isVisible());accept=true;await write('/trash',()=>page.locator('#assessment-trash').click());assert.equal(await page.locator(`[data-assessment-row="${abandoned.id}"]`).count(),0);await page.locator('[data-assessment-view="trash"]').click();await write('/restore',()=>page.locator(`[data-assessment-row="${abandoned.id}"]`).getByRole('button',{name:'Restaurer le brouillon',exact:true}).click());await page.locator('[data-assessment-view="active"]').click();await page.locator(`[data-assessment-row="${abandoned.id}"] [data-assessment-action="open"]`).click();assert.equal(await field('clinical.reason').inputValue(),'Brouillon abandonné, données fictives');
  await page.setViewportSize(devices['iPhone 13'].viewport);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/infinity-2.6.0-compact-iphone.png',fullPage:true});await page.setViewportSize({width:1440,height:1000});
  await page.locator(`[data-assessment-row="${initial.id}"] [data-assessment-action="pdf"]`).click();await page.locator('#assessment-confirm-resident').check();const secondDownload=page.waitForEvent('download');await page.locator('#assessment-download').click();assert.equal((await secondDownload).suggestedFilename(),'Bilan_Kinesitherapique_2026-11-12.pdf');await page.locator('#modal').getByRole('button',{name:'Fermer',exact:true}).click();assert.equal(await field('clinical.reason').inputValue(),'Brouillon abandonné, données fictives');
- await page.locator(`[data-assessment-row="${initial.id}"] [data-assessment-action="reevaluate"]`).click();await page.locator('#assessment-new-date').fill('2026-12-12');const reevaluation=await write('/api/assessments',()=>page.getByRole('button',{name:'Créer le brouillon',exact:true}).click());assert.equal(reevaluation.type,'reevaluation');assert.equal(reevaluation.previousId,initial.id);assert.equal(await field('clinical.mrc.status').inputValue(),'');assert.equal(await field('clinical.walk.possible').inputValue(),'');await write('/trash',()=>page.locator('#assessment-trash').click());await page.locator('[data-assessment-view="active"]').click();await page.locator('[data-assessment-row="legacy-preserved"] [data-assessment-action="open"]').click();assert.equal(await field('clinical.anamnesis.medical').inputValue(),'Antécédent clinique historique préservé');assert.equal(await page.locator('#assessment-trash').count(),0);assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(old.id).data,oldData);
+ await page.locator(`[data-assessment-row="${initial.id}"] [data-assessment-action="reevaluate"]`).click();await page.locator('#assessment-new-date').fill('2026-12-12');const reevaluation=await write('/api/assessments',()=>page.getByRole('button',{name:'Créer le brouillon',exact:true}).click());assert.equal(reevaluation.type,'reevaluation');assert.equal(reevaluation.previousId,initial.id);assert.equal(await field('clinical.mrc.status').inputValue(),'');assert.equal(await field('clinical.walk.possible').inputValue(),'');await write('/trash',()=>page.locator('#assessment-trash').click());await page.locator('[data-assessment-view="active"]').click();await page.locator('[data-assessment-row="legacy-preserved"] [data-assessment-action="open"]').click();assert.equal(await field('clinical.anamnesis.medical').inputValue(),'Antécédent clinique historique préservé');assert.equal(await diagnosticPreview.locator('li').textContent(),'Diagnostic ancien conservé');assert.equal(await page.locator('#assessment-trash').count(),0);assert.equal(app.db.prepare('SELECT data FROM assessments WHERE id=?').get(old.id).data,oldData);
  await page.setViewportSize(devices['iPhone 13'].viewport);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/infinity-2.6.0-bilan-iphone.png',fullPage:true});assert.deepEqual(errors,[]);assert.deepEqual(app.db.prepare('SELECT * FROM state').get(),baseline);
  const mobileKine=await browser.newContext({...devices['iPhone 13'],locale:'fr-FR'});
  await mobileKine.addCookies([{name:'infinity_session',value:sessions.kine.token,url:'http://localhost:31007'}]);

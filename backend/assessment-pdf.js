@@ -1,9 +1,9 @@
 import {walkingFields,anamnesisFields,jointFields,testDefinitions,testResult,tinettiScores,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,stairsResults,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
+import {diagnosisPresentation,muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,stairsResults,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
  recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 
-export const assessmentPdfVersion='2.6.3';
+export const assessmentPdfVersion='2.6.4';
 const pageWidth=595.28,pageHeight=841.89,margin=46,width=pageWidth-2*margin,top=745,bottom=51;
 const leading=14,bodySize=10.4;
 const dateFR=value=>new Date(value+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});
@@ -81,15 +81,21 @@ function documentLayout(record,clean){
  };
  const available=()=>y-bottom;
  const ensure=height=>{if(available()<height)page();};
- function paragraph(value,{bullet=false,justify=false}={}){
+ function paragraph(value,{bullet=false,justify=false,heading='',keepPoint=false}={}){
   const indent=bullet?13:0,lineWidth=width-indent;
-  const groups=clean(value).trim().split(/\n\s*\n/).map(block=>wrap(block,lineWidth,bodySize)).filter(lines=>lines.length);
+  const label=normalize(clean(heading));
+  const labelWidth=measuredWidth(label,bodySize,true)-measuredWidth(label,bodySize);
+  const content=label?[label,normalize(clean(value))].filter(Boolean).join(' '):clean(value).trim();
+  const groups=content.split(/\n\s*\n/).map(block=>wrap(block,lineWidth-Math.max(0,labelWidth),bodySize)).filter(lines=>lines.length);
+  const minimum=lines=>(keepPoint&&lines.length<=3?lines.length:Math.min(2,lines.length))*leading;
   if(!groups.length)return null;
   return {
-   min:Math.min(2,groups[0].length)*leading+4,
+   min:minimum(groups[0])+4,
    height:groups.reduce((total,lines)=>total+lines.length*leading+4,0),
    draw(){
+    let boldRemaining=label.length;
     for(const lines of groups){
+     if(keepPoint)ensure(minimum(lines));
      for(let i=0;i<lines.length;i++){
       const remaining=lines.length-i;
       ensure((remaining===2||i===0&&remaining>1?2:1)*leading);
@@ -101,6 +107,11 @@ function documentLayout(record,clean){
         text(word,x,y-10);
         x+=measuredWidth(word+' ',bodySize)+extra;
        }
+      }else if(boldRemaining>0){
+       const line=lines[i],bold=line.slice(0,boldRemaining),rest=line.slice(boldRemaining);
+       text(bold,margin+indent,y-10,bodySize,true);
+       if(rest)text(rest,margin+indent+measuredWidth(bold,bodySize,true),y-10);
+       boldRemaining-=line.length+1;
       }else text(lines[i],margin+indent,y-10);
       y-=leading;
      }
@@ -333,9 +344,13 @@ export function assessmentPDF(record,previous){
  const review=record.clinical.schema===2?
   record.reviewWindow&&paragraph('Échéance de réévaluation : '+reviewLabel(record)):
   record.reviewDate&&paragraph('Échéance de réévaluation : '+dateFR(record.reviewDate));
+ const diagnosis=diagnosisPresentation(clean(record.diagnosis));
  const blocks=[
   validation(record.finalizedAt,record.finalizedBy),...clinical,
-  section('03 — Diagnostic kinésithérapique',[paragraph(normalize(clean(record.diagnosis)),{justify:true}),sectionValidation(record.diagnosisValidatedAt,record.diagnosisValidatedBy)],true),
+  section('03 — Diagnostic kinésithérapique',[
+   ...diagnosis.points.map(({heading,body})=>paragraph(body,{bullet:true,heading,keepPoint:true})),
+   paragraph(diagnosis.notice),sectionValidation(record.diagnosisValidatedAt,record.diagnosisValidatedBy)
+  ],true),
   section('04 — Projet thérapeutique',[
    ...objectives.map(value=>paragraph(value,{bullet:true})),
    record.clinical.schema!==2&&record.frequency&&paragraph('Fréquence : '+record.frequency),

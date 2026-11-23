@@ -73,3 +73,6 @@
 
 .stairs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px}
 .stairs-grid>div{min-width:0}
+
+.diagnosis-points { padding-inline-start: 1.5em; }
+.diagnosis-points li + li { margin-block-start: .35em; }

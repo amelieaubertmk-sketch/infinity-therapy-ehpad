@@ -1,4 +1,4 @@
-# Run from the extracted 2.6.3 archive, using the account of the scheduled task.
+# Run from the extracted 2.6.4 archive, using the account of the scheduled task.
 param(
   [string]$BackupRoot = (Join-Path $env:LOCALAPPDATA 'InfinityTherapyBackups'),
   [string]$TaskName = 'InfinityTherapyDemo'
@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $source = (Resolve-Path -LiteralPath (Split-Path $PSScriptRoot -Parent)).Path
 $manifestPath = Join-Path $PSScriptRoot 'bilans-runtime-manifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.release -ne '2.6.3' -or !$manifest.runtime) { throw 'Extraire la livraison complete Infinity Therapy 2.6.3.' }
+if ($manifest.release -ne '2.6.4' -or !$manifest.runtime) { throw 'Extraire la livraison complete Infinity Therapy 2.6.4.' }
 $configPath = Join-Path $env:LOCALAPPDATA 'InfinityTherapyDemo\config.json'
 $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
 $project = (Resolve-Path -LiteralPath $config.project).Path
@@ -83,7 +83,7 @@ if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyCon
   throw 'Le port ecoute encore. Fermer le serveur Infinity Therapy eventuellement lance a la main. Aucun fichier remplace.'
 }
 
-$backup = Join-Path $backupBase ('avant-2.6.3-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
+$backup = Join-Path $backupBase ('avant-2.6.4-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 New-Item -ItemType Directory -Path $backup | Out-Null
 Copy-Item -LiteralPath $data -Destination (Join-Path $backup 'donnees') -Recurse
 Copy-Item -LiteralPath $configPath -Destination (Join-Path $backup 'config.json')
@@ -118,7 +118,7 @@ try {
     catch { Start-Sleep -Seconds 1 }
   }
   if ($runtime.api -ne $manifest.release -or $runtime.rules -ne $manifest.release -or $runtime.pdf -ne $manifest.release) {
-    throw 'Le processus qui repond sur le port configure ne confirme pas la version 2.6.3.'
+    throw 'Le processus qui repond sur le port configure ne confirme pas la version 2.6.4.'
   }
   $diagnostic = & $config.node (Join-Path $PSScriptRoot 'diagnose-bilans.js') --project $project --base $base --manifest $manifestPath
   if ($LASTEXITCODE -ne 0) { throw 'Le diagnostic du serveur a echoue.' }
@@ -130,5 +130,5 @@ try {
   Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
   throw ("Mise a jour non verifiee. Tache arretee. Sauvegarde : " + $backup + ". " + $_.Exception.Message)
 }
-Write-Host 'Infinity Therapy 2.6.3 verifiee : API, regles, PDF et modules HTTP.'
-Write-Host 'Ouvrir votre adresse habituelle, actualiser la page et verifier Version 2.6.3 en bas de page.'
+Write-Host 'Infinity Therapy 2.6.4 verifiee : API, regles, PDF et modules HTTP.'
+Write-Host 'Ouvrir votre adresse habituelle, actualiser la page et verifier Version 2.6.4 en bas de page.'

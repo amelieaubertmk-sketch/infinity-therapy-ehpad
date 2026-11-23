@@ -236,7 +236,7 @@ test('PDF layout keeps transfers together, repeats long-table headers and uses o
  const normalized=short[0].replace(/\s+/g,' ');
  assert.match(normalized,/BILAN DIAGNOSTIQUE KINÉSITHÉRAPIQUE/);
  assert.match(normalized,/Validation : 12\/11\/2026.*Amélie/);
- assert.match(normalized,/Conclusion clinique fictive validée\. Deuxième phrase approuvée\./);
+ assert.match(normalized,/Conclusion clinique fictive validée\. • Deuxième phrase approuvée\./);
  assert.equal(normalized.match(/Sécuriser les déplacements\./g).length,1);
  assert.match(normalized,/Page 1 \/ 1$/);
  assert.doesNotMatch(normalized,/Infinity Therapy|\(Paris\)|PROPOSITION_NON_VALIDÉE/i);
@@ -295,7 +295,7 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   const oldExport=await call('/'+old.id+'/export',{body:exportBody});
   assert.equal(oldExport.status,200);
   assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
-  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,7);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,8);
   const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
   assert.equal(originalComparison.status,200);
   const correctionBody={revision:1,assessment:old,confirmation:'CORRIGER',confirmReviewed:true};
@@ -389,11 +389,11 @@ test('walking distance persists as a bounded description and an open-ended measu
   assert.equal(walkingPerimeter(distance).meters,meters);
   validateCompact(c,true);
   const diagnosis=compactDiagnosis(c);
-  assert.ok(diagnosis.includes('Périmètre de marche '+expected+'.'));
+  assert.ok(diagnosis.includes('périmètre de marche '+expected+'.'));
   const pdf=spawnSync('pdftotext',['-','-'],{input:assessmentPDF({...record,diagnosis}),encoding:'utf8'});
   if(pdf.error?.code==='ENOENT'){pdfAvailable=false;continue;}
   assert.equal(pdf.status,0,pdf.stderr);
-  assert.ok(pdf.stdout.replace(/\s+/g,' ').includes('Périmètre de marche '+expected));
+  assert.ok(pdf.stdout.replace(/\s+/g,' ').includes('périmètre de marche '+expected));
  }
  const previous=structuredClone(c);
  previous.walk.distance='100 m';
@@ -427,7 +427,7 @@ test('diagnosis carries both indicative levels and uses the actual Tinetti subsc
  assert.equal(diagnosis.match(/vigilance adaptée/g).length,1);
  assert.doesNotMatch(diagnosis,/fauteuil roulant|protocole|aucune classification/i);
  c.walk.wheelchair='Oui';
- assert.match(compactDiagnosis(c),/Marche possible\.[\s\S]*Utilisation habituelle d’un fauteuil roulant/);
+ assert.match(compactDiagnosis(c),/Marche : possible\.[\s\S]*Utilisation habituelle d’un fauteuil roulant/);
  for(const [time,risk,detail] of [['11','faible','relativement préservée'],['24','élevé','ralentissement important'],['30','très élevé','fortement ralentie']]){
   c.tug.time=time;
   const result=compactDiagnosis(c);
@@ -467,9 +467,14 @@ test('moderate Tinetti and TUG, plus a 19-second 5xSTS, agree in the proposal an
  assert.match(content,/Temps 12 secondes Interprétation Risque de chute modéré/);
  assert.match(content,/Temps 19 secondes.*Interprétation Performance nettement ralentie/);
  assert.doesNotMatch(content,/Score descriptif|protocole standard|aucune classification/i);
+ const [diagnostic,project]=content.split('03 — Diagnostic kinésithérapique ')[1].split('04 — Projet thérapeutique ');
+ for(const test of ['Tinetti : 24/28','TUG : 12 secondes','5xSTS : 19 secondes'])assert.ok(diagnostic.includes('• '+test),diagnostic);
+ assert.equal(diagnostic.match(/Les niveaux de risque indiqués/g)?.length,1);
+ assert.match(diagnostic,/Les niveaux de risque indiqués constituent des repères à interpréter au regard de l’évaluation clinique globale\./);
+ assert.match(project,/^• Projet fictif\./);
  const historical='Texte précédemment validé, conservé exactement.';
  const archived=extract({...record,diagnosis:historical});
  assert.equal(archived.status,0,archived.stderr);
- assert.match(archived.stdout.replace(/\s+/g,' '),/03 — Diagnostic kinésithérapique Texte précédemment validé, conservé exactement\./);
+ assert.match(archived.stdout.replace(/\s+/g,' '),/03 — Diagnostic kinésithérapique • Texte précédemment validé, conservé exactement\./);
  assert.equal(record.diagnosis,diagnosis);
 });
