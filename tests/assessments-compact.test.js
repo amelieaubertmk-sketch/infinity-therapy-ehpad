@@ -295,9 +295,14 @@ test('permanent deletion verifies active storage, clears dependent cache and pre
   const oldExport=await call('/'+old.id+'/export',{body:exportBody});
   assert.equal(oldExport.status,200);
   assert.match(Buffer.from(oldExport.data.file,'base64').toString('latin1'),/^%PDF-1\.4/);
-  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,6);
+  assert.equal(app.db.prepare('SELECT format_version FROM assessment_documents WHERE assessment_id=?').get(old.id).format_version,7);
   const originalComparison=await call('/'+child.id+'/export',{body:exportBody});
   assert.equal(originalComparison.status,200);
+  const correctionBody={revision:1,assessment:old,confirmation:'CORRIGER',confirmReviewed:true};
+  const correctionRoute='/'+old.id+'/correct';
+  assert.equal((await call(correctionRoute,{method:'PUT',actor:'colleague',body:correctionBody})).status,403);
+  assert.equal((await call(correctionRoute,{method:'PUT',body:{...correctionBody,confirmReviewed:false}})).status,400);
+  assert.equal((await call(correctionRoute,{method:'PUT',body:{...correctionBody,revision:2}})).status,409);
   const purge='/'+old.id+'/purge',valid={revision:1,confirmation:'effacer'};
   assert.equal((await call(purge,{actor:'secretary',body:valid})).status,403);
   assert.equal((await call(purge,{actor:'colleague',body:valid})).status,403);

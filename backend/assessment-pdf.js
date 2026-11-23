@@ -1,9 +1,9 @@
 import {walkingFields,anamnesisFields,jointFields,testDefinitions,testResult,tinettiScores,comparison,balanceItems,gaitItems} from '../src/assessments-domain.js';
-import {muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
+import {muscleRows,findingOptions,effectiveAids,effectiveTug,walkingPerimeter,stairsResults,compactTinetti,tinettiStatus,tinettiGroups,tinettiFields,tinettiRisk,tinettiContext,tinettiIncomplete,tinettiNotEvaluable,tinettiAssistanceWarning,reviewLabel,
  recordedTugDetails,tugRisk,tugContext,tugVigilance,tugPhysicalAssistance,tugLegacyAdaptation,chairStatus,chairResult,chairArms} from '../src/assessments-compact.js';
 import {pdfFonts,measuredWidth} from './pdf-font.js';
 
-export const assessmentPdfVersion='2.6.2';
+export const assessmentPdfVersion='2.6.3';
 const pageWidth=595.28,pageHeight=841.89,margin=46,width=pageWidth-2*margin,top=745,bottom=51;
 const leading=14,bodySize=10.4;
 const dateFR=value=>new Date(value+'T12:00:00Z').toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'});
@@ -159,7 +159,7 @@ function documentLayout(record,clean){
  function section(title,blocks,major=false,keepTogether=false){
   const items=blocks.filter(Boolean);
   if(!items.length)return null;
-  const spacing=major?29:20;
+  const spacing=major?32:22;
   const groupHeight=keepTogether?items.reduce((total,item)=>total+item.height,0):Infinity;
   const min=spacing+(groupHeight<=160?groupHeight:items[0].min);
   return {min,draw(){
@@ -206,7 +206,8 @@ function compactSections(c,{section,paragraph,table}){
   ['Possibilité de marche',c.walk.possible],
   ['Aide utilisée',c.walk.possible==='Possible'?effectiveAids(c).join(', '):''],
   ['Périmètre de marche',c.walk.possible==='Possible'?walkingPerimeter(c.walk.distance,{legacy:true})?.description:''],
-  ['Fauteuil roulant habituel',c.walk.wheelchair]
+  ['Fauteuil roulant habituel',c.walk.wheelchair],
+  ...stairsResults(c.walk.stairs)
  ];
  const tinetti=[],test=c.tinetti,status=tinettiStatus(test),scores=compactTinetti(c);
  if(status==='Impossible')tinetti.push(['Résultat',test.reason?'Impossible — '+test.reason:'Impossible']);

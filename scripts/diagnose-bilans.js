@@ -13,7 +13,7 @@ function readJson(file,label){
  try{return JSON.parse(new TextDecoder(encoding,{fatal:true}).decode(bytes));}
  catch{throw Error('JSON invalide dans '+label+'. Vérifier le fichier et son encodage.');}
 }
-const schema={state:['id','revision','data'],assessments:['id','resident_id','owner','status','revision','data'],assessment_tracking:['assessment_id','deleted_at','deleted_by','titan_at','titan_by','titan_name'],assessment_versions:['id','assessment_id','at','actor','data'],assessment_documents:['assessment_id','pdf','created_at','format_version']};
+const schema={state:['id','revision','data'],assessments:['id','resident_id','owner','status','revision','data'],assessment_tracking:['assessment_id','deleted_at','deleted_by','titan_at','titan_by','titan_name','topaz_at','topaz_by','topaz_name'],assessment_versions:['id','assessment_id','at','actor','data'],assessment_documents:['assessment_id','pdf','created_at','format_version']};
 export async function diagnoseBilans({project,base,manifest,checkSyntax=true,dataFile}){
  const root=realpathSync(project),result={project:root,node:process.version,checks:[],routes:null,http:[],schema:null,conclusions:[]};
  for(const [file,expected] of Object.entries(manifest.files)){

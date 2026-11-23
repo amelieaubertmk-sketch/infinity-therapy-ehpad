@@ -1,6 +1,6 @@
 # Infinity Therapy — Transmissions EHPAD
 
-**Version 2.6.2** — [Mise à jour Windows et vérification du serveur réellement chargé](docs/MISE-A-JOUR-2.6.2.md).
+**Version 2.6.3** — [Mise à jour Windows et vérification du serveur réellement chargé](docs/MISE-A-JOUR-2.6.3.md).
 
 **404 Bilans persistant après 2.6.1** : [réparation guidée du projet réellement configuré](docs/REPARATION-INSTALLATION-BILANS-2.6.1.md). Le script Windows à lancer manuellement sauvegarde, répare la liste statique, restaure les modules si nécessaire, redémarre la tâche existante et contrôle les sept modules HTTP. [Rapport de tests](docs/VALIDATION-REPARATION-BILANS-2.6.1.md).
 

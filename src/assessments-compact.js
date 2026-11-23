@@ -1,7 +1,7 @@
 // Compact assessment schema v2. Local deterministic rules; legacy documents are never converted.
-export const assessmentRulesVersion='2.6.2';
+export const assessmentRulesVersion='2.6.3';
 export const muscleRows=[['pull','Traction','upper'],['push','Poussée','upper'],['grip','Préhension','upper'],['hip','Flexion de hanche','lower'],['kneeFlex','Flexion de genou','lower'],['kneeExt','Extension de genou','lower'],['ankleDorsi','Releveurs du pied','lower'],['anklePlantar','Flexion plantaire','lower']];
-export const assistanceOptions=['Aide humaine','Canne anglaise (béquille)','Canne simple','Canne tripode','Déambulateur 2 roues','Déambulateur 4 roues'];
+export const assistanceOptions=['Aide humaine','Canne anglaise (béquille)','Canne simple','Canne tripode','Déambulateur 2 roues','Déambulateur 4 roues','Cadre de marche','Barres parallèles'];
 export const reasons=['Difficultés de compréhension ou d’exécution de la consigne','Douleur limitant l’évaluation','Fatigabilité','Refus du résident','Autre motif'];
 export const findingOptions=[['strength','Déficit de force musculaire'],['balance','Troubles de l’équilibre'],['walking','Difficultés à la marche'],['distance','Limitation du périmètre de marche'],['transfer','Difficultés de transfert'],['conditioning','Déconditionnement fonctionnel'],['joints','Limitation articulaire'],['pain','Douleur avec retentissement fonctionnel'],['autonomy','Perte d’autonomie'],['instructions','Difficultés de compréhension ou d’exécution des consignes']];
 // POMA 28: the 360-degree turn has two independent one-point observations.
@@ -78,6 +78,22 @@ export function chairResult(chair){
 }
 export function newCompactClinical(){return {schema:2,reason:'',observationsEnabled:false,observations:'',mrc:{status:'',reason:'',other:'',cells:Object.fromEntries(muscleRows.flatMap(([id])=>['R','L'].map(side=>[id+side,{value:'',reason:''}])) )},walk:{possible:'',aidEnabled:false,aids:[],distance:'',wheelchair:''},tug:{status:'',time:'',reason:'',aidsOverride:false,aids:[],aidsInitialized:false,protocol:'',conditions:'',details:newTugDetails()},tinetti:{status:'',reason:'',items:Object.fromEntries(pomaItems.map(([id])=>[id,''])),details:newTinettiDetails()},chair:{status:'',time:'',reason:'',arms:'',humanAssistance:'',notes:'',protocol:'',conditions:''},jointsEnabled:false,joints:'',transfers:{bedChair:'',sitStand:''},findings:[]};}
 const isNumber=v=>typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v))&&Number(v)>=0;
+export const stairsDirections=[['up','Montée'],['down','Descente']];
+export const stairsStatuses=['Non évaluée','Possible','Impossible'];
+export const stairsAids=['Aucune aide','Rampe / main courante','Aide humaine','Aide technique'];
+export function newStairs(){
+ return {up:{status:'',aids:[]},down:{status:'',aids:[]},notes:''};
+}
+export function stairsResults(stairs){
+ if(!stairs)return [];
+ const rows=stairsDirections.flatMap(([key,label])=>{
+  const {status,aids}=stairs[key];
+  if(!['Possible','Impossible'].includes(status))return [];
+  return [[label+' des escaliers',status.toLowerCase()+(status==='Possible'&&aids.length?' — '+aids.join(', '):'')]];
+ });
+ if(stairs.notes.trim())rows.push(['Observations complémentaires — Escaliers',stairs.notes]);
+ return rows;
+}
 export const walkingPerimeterError='Saisir un périmètre entre 0 et 100 m, ou « > 100 m ».';
 export function walkingPerimeter(value,{legacy=false}={}){
  if(typeof value!=='string')return null;
@@ -153,6 +169,19 @@ export function validateCompact(c,complete=false){
  if(c?.schema!==2||!c.mrc?.cells||!c.walk||!c.tinetti?.items||!c.chair||!c.tug||!c.transfers)throw Error('Format clinique compact invalide.');text(c.reason);text(c.observations);text(c.joints);bool(c.observationsEnabled);bool(c.jointsEnabled);choice(c.mrc.status,['','Réalisable','Non réalisable']);text(c.mrc.reason);text(c.mrc.other);if(c.mrc.reason)choice(c.mrc.reason,reasons);
  for(const [id] of muscleRows)for(const side of ['R','L']){const cell=c.mrc.cells[id+side];if(!cell)throw Error('Cellule MRC absente.');choice(cell.value,['','0','1','2','3','4','5','NE']);choice(cell.reason,['',...reasons]);}
  choice(c.walk.possible,['','Possible','Impossible']);choice(c.walk.wheelchair,['','Oui','Non']);bool(c.walk.aidEnabled);text(c.walk.distance,30);if(c.walk.distance&&!walkingPerimeter(c.walk.distance,{legacy:true}))throw Error(walkingPerimeterError);const aids=a=>{if(!Array.isArray(a)||new Set(a).size!==a.length||a.some(v=>!assistanceOptions.includes(v)))throw Error('Aide de marche invalide.');};aids(c.walk.aids);
+ if(Object.hasOwn(c.walk,'stairs')){
+  const stairs=c.walk.stairs;
+  if(!stairs?.up||!stairs?.down)throw Error('Évaluation des escaliers invalide.');
+  text(stairs.notes);
+  for(const [key] of stairsDirections){
+   const entry=stairs[key];
+   choice(entry.status,['',...stairsStatuses]);
+   if(!Array.isArray(entry.aids)||new Set(entry.aids).size!==entry.aids.length||
+      entry.aids.some(aid=>!stairsAids.includes(aid))||entry.aids.includes('Aucune aide')&&entry.aids.length>1){
+    throw Error('Aides aux escaliers invalides.');
+   }
+  }
+ }
  for(const key of ['tug','tinetti','chair']){
   const test=c[key];
   const statuses=key==='chair'?chairStatuses.map(([status])=>status):key==='tinetti'?tinettiStatuses:['Réalisé'];
@@ -305,8 +334,18 @@ export function compactDiagnosis(c){
  else if(c.walk.possible==='Impossible')lines.push('La marche n’est pas réalisable lors de cette évaluation.');
  if(c.walk.possible==='Possible'){
   const aids=effectiveAids(c),perimeter=walkingPerimeter(c.walk.distance,{legacy:true});
-  lines.push(aids.length?'Marche possible avec '+aids.join(', ')+'.':'Marche possible.');
+  if(aids.includes('Barres parallèles')){
+   lines.push('Marche possible entre les barres parallèles, dans un environnement sécurisé.');
+   const other=aids.filter(aid=>aid!=='Barres parallèles');
+   if(other.length)lines.push('Autres aides à la marche renseignées : '+other.join(', ')+'.');
+  }else lines.push(aids.length?'Marche possible avec '+aids.join(', ')+'.':'Marche possible.');
   if(perimeter)lines.push('Périmètre de marche '+perimeter.description+'.');
+ }
+ const stairs=stairsResults(c.walk.stairs);
+ if(stairs.some(([label])=>label.endsWith('des escaliers'))){
+  for(const [label,value] of stairs){
+   lines.push(label.endsWith('des escaliers')?label+' '+(value.endsWith(' — Aucune aide')?value.replace(' — Aucune aide',' sans aide'):value.replace(' — ',' avec '))+'.':label+' : '+value);
+  }
  }
  if(c.walk.wheelchair==='Oui')lines.push('Utilisation habituelle d’un fauteuil roulant.');
 
@@ -321,7 +360,7 @@ export function compactDiagnosis(c){
    lines.push(time+' — '+tugRisk(e.tug)+'. '+tugDiagnostic[tugLevel]+(tugLevel==='moderate'&&e.pomaRisk!=='moderate'?vigilance:'')+caution);
   }else lines.push(time+'. Temps descriptif.');
  }
- if(e.scores.total!==null||tugLevel)lines.push('Ces niveaux de risque sont des repères indicatifs à confronter à l’évaluation clinique globale.');
+
  if(e.riskConflict)lines.push(riskDisagreement);
  if(!e.walkConflict&&(e.gait.length||e.has('walking')||e.balance)){
   const signs=[...(e.balance?['instabilité ou trouble de l’équilibre documenté']:[]),...e.gait];
@@ -349,6 +388,7 @@ export function compactDiagnosis(c){
  const otherFindings=findingOptions.filter(([id])=>['distance','conditioning','pain','autonomy'].includes(id)&&e.has(id));
  if(otherFindings.length)lines.push('Autres constats : '+otherFindings.map(([,label])=>label.toLocaleLowerCase('fr-FR')).join(', ')+'.');
  for(const [label,note] of testNotes(c))lines.push(label+' : '+note.trim());
+ if(e.scores.total!==null||tugLevel)lines.push('Les niveaux de risque indiqués constituent des repères à interpréter au regard de l’évaluation clinique globale.');
  return lines.join('\n\n')||'Les données disponibles ne permettent pas encore de proposer une synthèse fonctionnelle.';
 }
 export function compactProject(c){

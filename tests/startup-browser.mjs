@@ -14,7 +14,7 @@ try{
   const context=await browser.newContext({javaScriptEnabled:mode!=='no-javascript'});await context.addCookies([{name:'infinity_session',value:session.token,url:'http://localhost:31008'}]);await context.addInitScript(()=>localStorage.setItem('startup-sentinel','conserver'));let legacyRequests=0,assessmentsRequests=0;
   await context.route('**/api/assessment-runtime',route=>{
    if(mode==='stale-runtime')return route.fulfill({status:404,json:{error:'Introuvable.'}});
-   if(mode==='mixed-runtime')return route.fulfill({status:200,json:{api:'2.6.2',rules:'2.6.1',pdf:'2.6.2'}});
+   if(mode==='mixed-runtime')return route.fulfill({status:200,json:{api:'2.6.3',rules:'2.6.1',pdf:'2.6.3'}});
    return route.continue();
   });
   await context.route('**/api/assessments**',async route=>{const p=new URL(route.request().url()).pathname;if(mode==='backend-incompatible'&&p==='/api/assessments/trash')return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Bilan introuvable.'})});if(mode==='api-non-json'&&p==='/api/assessments')return route.fulfill({status:502,contentType:'text/html',body:'<h1>Bad gateway</h1>'});if(mode==='api-shape'&&p==='/api/assessments')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({unexpected:true})});return route.continue();});
@@ -34,7 +34,7 @@ try{
   else if(mode==='blocked-app'||mode==='no-javascript'){assert.ok((await page.locator('#app').innerText()).includes('Si ce message persiste'));}
   else{await page.locator('#logout').waitFor();assert.equal(assessmentsRequests,0,'Bilans must not block initial startup');await page.getByRole('button',{name:'Bilans résidents',exact:true}).click();if(['missing-assessments','missing-compact','wrong-mime','broken-compact','missing-export','server-502'].includes(mode)){const diagnostic=page.locator('#assessment-load-diagnostic');await diagnostic.waitFor();const text=await diagnostic.innerText();if(mode==='missing-assessments')assert.match(text,/HTTP 404.*assessments\.js/);if(mode==='missing-compact')assert.match(text,/HTTP 404.*assessments-compact\.js/);if(mode==='wrong-mime')assert.match(text,/Type MIME non JavaScript/);if(mode==='broken-compact')assert.match(text,/SyntaxError/);if(mode==='missing-export')assert.match(text,/export/);if(mode==='server-502')assert.match(text,/HTTP 502/);await page.getByRole('button',{name:'Kiné',exact:true}).click();await page.locator('#transmission-form').waitFor();}else if(['stale-runtime','mixed-runtime'].includes(mode)){
    const message=await page.locator('#assessment-load-diagnostic').innerText();
-   assert.match(message,/attend Infinity Therapy 2.6.2/);
+   assert.match(message,/attend Infinity Therapy 2.6.3/);
    assert.match(message,/processus Node chargé est ancien, incomplet ou inaccessible/);
    assert.equal(await page.locator('#assessment-new').count(),0);
    await page.getByRole('button',{name:'Kiné',exact:true}).click();

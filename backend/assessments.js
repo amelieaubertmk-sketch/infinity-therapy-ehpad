@@ -5,12 +5,15 @@ import {emptyClinical,validateClinical,generateDiagnosis,generateProject} from '
 import {newCompactClinical,walkingPerimeter,walkingPerimeterError,assessmentRulesVersion} from '../src/assessments-compact.js';
 import {assessmentPDF,assessmentPdfVersion} from './assessment-pdf.js';
 import {technicalLog} from './log.js';
-export const assessmentRuntime=Object.freeze({api:'2.6.2',rules:assessmentRulesVersion,pdf:assessmentPdfVersion});
-const pdfFormatVersion=6;
+export const assessmentRuntime=Object.freeze({api:'2.6.3',rules:assessmentRulesVersion,pdf:assessmentPdfVersion});
+const pdfFormatVersion=7;
 export function initializeAssessments(db){db.exec(`CREATE TABLE IF NOT EXISTS assessments(id TEXT PRIMARY KEY,resident_id TEXT NOT NULL,owner TEXT NOT NULL,status TEXT NOT NULL,revision INTEGER NOT NULL,data TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS assessment_tracking(assessment_id TEXT PRIMARY KEY,deleted_at TEXT,deleted_by TEXT,titan_at TEXT,titan_by TEXT,titan_name TEXT);
  CREATE TABLE IF NOT EXISTS assessment_versions(id INTEGER PRIMARY KEY,assessment_id TEXT NOT NULL,at TEXT NOT NULL,actor TEXT NOT NULL,data TEXT NOT NULL);
- CREATE TABLE IF NOT EXISTS assessment_documents(assessment_id TEXT PRIMARY KEY,pdf BLOB NOT NULL,created_at TEXT NOT NULL,format_version INTEGER NOT NULL);`);}
+ CREATE TABLE IF NOT EXISTS assessment_documents(assessment_id TEXT PRIMARY KEY,pdf BLOB NOT NULL,created_at TEXT NOT NULL,format_version INTEGER NOT NULL);`);
+ const columns=new Set(db.prepare('PRAGMA table_info(assessment_tracking)').all().map(row=>row.name));
+ for(const column of ['topaz_at','topaz_by','topaz_name'])if(!columns.has(column))db.exec('ALTER TABLE assessment_tracking ADD COLUMN '+column+' TEXT');
+}
 const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
 function purgeAssessment(db,id,actor){
  // Cached comparisons can contain measurements from the assessment being erased.
@@ -63,18 +66,18 @@ export function assessmentRoute({db,user,route,method,body,json}){
   return true;
  }
  const clinician=isClinician(user),residents=snapshot(db).state.residents;
- const read=row=>{if(!row)return null;const r=JSON.parse(row.data),t=db.prepare('SELECT * FROM assessment_tracking WHERE assessment_id=?').get(row.id);return {...r,revision:row.revision,residentSector:r.residentSector??residents.find(x=>x.id===r.residentId)?.sector??'',deletedAt:t?.deleted_at||null,deletedBy:t?.deleted_by||null,titanConfirmedAt:t?.titan_at||null,titanConfirmedBy:t?.titan_name||null};};
+ const read=row=>{if(!row)return null;const r=JSON.parse(row.data),t=db.prepare('SELECT * FROM assessment_tracking WHERE assessment_id=?').get(row.id);return {...r,revision:row.revision,residentSector:r.residentSector??residents.find(x=>x.id===r.residentId)?.sector??'',deletedAt:t?.deleted_at||null,deletedBy:t?.deleted_by||null,titanConfirmedAt:t?.titan_at||null,titanConfirmedBy:t?.titan_name||null,topazConfirmedAt:t?.topaz_at||null,topazConfirmedBy:t?.topaz_name||null};};
  const get=id=>read(db.prepare('SELECT * FROM assessments WHERE id=?').get(id));
  const canEdit=r=>canManageAssessment(user,r.owner);
  const visible=r=>r&&(r.status==='final'||canEdit(r));
- const core=r=>{const next={...r};for(const k of ['revision','deletedAt','deletedBy','titanConfirmedAt','titanConfirmedBy'])delete next[k];return next;};
+ const core=r=>{const next={...r};for(const k of ['revision','deletedAt','deletedBy','titanConfirmedAt','titanConfirmedBy','topazConfirmedAt','topazConfirmedBy'])delete next[k];return next;};
  const published=r=>{const copy={...r};if(!canEdit(r))delete copy.proposal;return copy;};
  const all=()=>db.prepare('SELECT * FROM assessments ORDER BY rowid DESC').all().map(read).filter(visible);
  if(method==='GET'&&route==='/api/assessments/trash'&&!clinician){json(403,{error:'Corbeille réservée aux rédacteurs autorisés.'});return true;}
  if(method==='GET'&&['/api/assessments','/api/assessments/trash','/api/assessments/pending'].includes(route)){let records=all();if(route.endsWith('/trash'))records=records.filter(r=>r.deletedAt&&canEdit(r));else records=records.filter(r=>!r.deletedAt);if(route.endsWith('/pending'))records=records.filter(r=>r.status==='final'&&!r.titanConfirmedAt).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));json(200,{assessments:records.map(published)});return true;}
  if(method==='GET'&&id){const r=get(id);if(!visible(r)){json(404,{error:'Bilan introuvable.'});return true;}if(action==='versions'){json(200,{versions:db.prepare('SELECT v.id,v.at,v.actor,v.data,u.name AS actorName FROM assessment_versions v LEFT JOIN users u ON u.id=v.actor WHERE v.assessment_id=? ORDER BY v.id').all(id).map(v=>({...v,data:JSON.parse(v.data)})).filter(v=>canEdit(r)||v.data.status==='final').map(v=>({...v,data:published(v.data)}))});return true;}if(!action){json(200,{assessment:published(r)});return true;}}
  if(!['POST','PUT'].includes(method)){json(405,{error:'Méthode interdite.'});return true;}
- if(!clinician&&!['export','titan'].includes(action)){json(403,{error:'Rédaction et validation réservées aux kinésithérapeutes.'});return true;}
+ if(!clinician&&!['export','titan','topaz'].includes(action)){json(403,{error:'Rédaction et validation réservées aux kinésithérapeutes.'});return true;}
  db.exec('BEGIN IMMEDIATE');try{
  const now=new Date().toISOString();if(/\bPATHOS\b/i.test(JSON.stringify(body)))throw Error('Terme non autorisé dans un bilan.');
  if(route==='/api/assessments'&&method==='POST'){
@@ -89,16 +92,23 @@ export function assessmentRoute({db,user,route,method,body,json}){
  audit(db,user.id,'assessment.export',id);db.exec('COMMIT');json(200,{file:Buffer.from(pdf).toString('base64'),filename:`Bilan_Kinesitherapique_${previous.date}.pdf`,assessmentId:id});return true;
  }
  if(body.revision!==previous.revision){db.exec('ROLLBACK');json(409,{error:'Bilan modifié par une autre session. Rechargez avant de reprendre ; votre formulaire est conservé.'});return true;}
- if(['trash','restore','titan'].includes(action)&&method==='POST'){
- if(action==='titan'){if(previous.status!=='final'||previous.deletedAt||body.confirmation!=='SAISI SUR TITAN')throw Error('Confirmation manuelle d’un bilan finalisé requise.');if(previous.titanConfirmedAt)throw Error('Ce bilan est déjà confirmé dans Titan.');db.prepare('INSERT INTO assessment_tracking(assessment_id,titan_at,titan_by,titan_name) VALUES(?,?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET titan_at=excluded.titan_at,titan_by=excluded.titan_by,titan_name=excluded.titan_name').run(id,now,user.id,user.name);}
- else {if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Action réservée au propriétaire du brouillon ou à l’administratrice.'});return true;}if(previous.status!=='draft')throw Error('Un bilan finalisé ne peut pas être supprimé par cette action.');if(action==='trash'){if(previous.deletedAt||body.confirmation!=='SUPPRIMER LE BROUILLON')throw Error('Confirmation de suppression requise.');db.prepare('INSERT INTO assessment_tracking(assessment_id,deleted_at,deleted_by) VALUES(?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by').run(id,now,user.id);}else{if(!previous.deletedAt||body.confirmation!=='RESTAURER')throw Error('Confirmation de restauration requise.');db.prepare('UPDATE assessment_tracking SET deleted_at=NULL,deleted_by=NULL WHERE assessment_id=?').run(id);}}
- db.prepare('UPDATE assessments SET revision=revision+1 WHERE id=?').run(id);audit(db,user.id,action==='titan'?'assessment.titan.confirm':'assessment.draft.'+action,id);db.exec('COMMIT');json(200,{assessment:published(get(id))});return true;
+ if(['trash','restore','titan','topaz'].includes(action)&&method==='POST'){
+ if(action==='titan'||action==='topaz'){
+  const clear=body.checked===false,system=action.toUpperCase();
+  if(previous.status!=='final'||previous.deletedAt||body.confirmation!==(clear?'ANNULER SAISIE ':'SAISI SUR ')+system)throw Error('Confirmation manuelle d’un bilan finalisé requise.');
+  if(Boolean(previous[action+'ConfirmedAt'])===!clear)throw Error('Cet état de suivi est déjà enregistré.');
+  db.prepare(`INSERT INTO assessment_tracking(assessment_id,${action}_at,${action}_by,${action}_name) VALUES(?,?,?,?)
+   ON CONFLICT(assessment_id) DO UPDATE SET ${action}_at=excluded.${action}_at,${action}_by=excluded.${action}_by,${action}_name=excluded.${action}_name`)
+   .run(id,clear?null:now,clear?null:user.id,clear?null:user.name);
  }
- if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Ce brouillon appartient à un autre évaluateur.'});return true;}if(previous.deletedAt)throw Error('Restaurer le brouillon avant modification.');if(previous.status==='final')throw Error('Bilan finalisé immuable. Créez une réévaluation.');let next=core(previous);
+ else {if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Action réservée au propriétaire du brouillon ou à l’administratrice.'});return true;}if(previous.status!=='draft')throw Error('Un bilan finalisé ne peut pas être supprimé par cette action.');if(action==='trash'){if(previous.deletedAt||body.confirmation!=='SUPPRIMER LE BROUILLON')throw Error('Confirmation de suppression requise.');db.prepare('INSERT INTO assessment_tracking(assessment_id,deleted_at,deleted_by) VALUES(?,?,?) ON CONFLICT(assessment_id) DO UPDATE SET deleted_at=excluded.deleted_at,deleted_by=excluded.deleted_by').run(id,now,user.id);}else{if(!previous.deletedAt||body.confirmation!=='RESTAURER')throw Error('Confirmation de restauration requise.');db.prepare('UPDATE assessment_tracking SET deleted_at=NULL,deleted_by=NULL WHERE assessment_id=?').run(id);}}
+ db.prepare('UPDATE assessments SET revision=revision+1 WHERE id=?').run(id);audit(db,user.id,['titan','topaz'].includes(action)?'assessment.'+action+(body.checked===false?'.clear':'.confirm'):'assessment.draft.'+action,id);db.exec('COMMIT');json(200,{assessment:published(get(id))});return true;
+ }
+ if(!canEdit(previous)){db.exec('ROLLBACK');json(403,{error:'Ce brouillon appartient à un autre évaluateur.'});return true;}if(previous.deletedAt)throw Error('Restaurer le brouillon avant modification.');const correction=method==='PUT'&&route==='/api/assessments/'+id+'/correct'&&previous.status==='final';if(previous.status==='final'&&!correction)throw Error('Bilan finalisé immuable. Créez une réévaluation.');let next=core(previous);
  if(action==='finalize'&&method==='POST'){
  validateClinical(next.clinical,true);if(!next.diagnosis.trim()||!next.project.trim()||body.confirmation!=='FINALISER')throw Error('Relire les textes avant validation.');if(next.clinical.schema===2||body.confirmReviewed===true){if(body.confirmReviewed!==true||(next.clinical.schema===2&&!['3m','6m','clinical'].includes(next.reviewWindow)))throw Error('Confirmer la relecture professionnelle et l’échéance.');for(const key of ['diagnosis','project']){next[key+'ValidatedAt']=now;next[key+'ValidatedBy']=user.name;next[key+'ValidatedById']=user.id;}}else if(!next.diagnosisValidatedAt||!next.projectValidatedAt||!next.frequency.trim()||!next.duration.trim()||!validDate(next.reviewDate)||next.reviewDate<next.date||(next.type==='reevaluation'&&!next.evolution.trim()))throw Error('Relire et valider le diagnostic, le projet et les modalités avant finalisation.');next={...next,status:'final',finalizedAt:now,finalizedBy:user.name,finalizedById:user.id};
- }else if(method==='PUT'&&!action){
- const input=body.assessment;if(!input||!validDate(input.date)||!['Amélie','Alexandre'].includes(input.practitioner))throw Error('Date ou praticien invalide.');validateClinical(input.clinical);if((input.clinical.schema||1)!==(previous.clinical.schema||1))throw Error('Le format du bilan existant est conservé. Créer un nouveau bilan ou une réévaluation pour changer de format.');for(const key of ['diagnosis','project','frequency','duration','reviewDate','evolution'])if(typeof input[key]!=='string'||input[key].length>30000)throw Error('Texte trop long ou invalide.');if(input.clinical.schema===2&&!['3m','6m','clinical'].includes(input.reviewWindow))throw Error('Échéance invalide.');
+ }else if(method==='PUT'&&(!action||correction)){
+ const input=body.assessment;if(!input||!validDate(input.date)||!['Amélie','Alexandre'].includes(input.practitioner))throw Error('Date ou praticien invalide.');validateClinical(input.clinical);if((input.clinical.schema||1)!==(previous.clinical.schema||1))throw Error('Le format du bilan existant est conservé. Créer un nouveau bilan ou une réévaluation pour changer de format.');for(const key of ['diagnosis','project','frequency','duration','reviewDate','evolution'])if((!correction||input[key]!==undefined)&&(typeof input[key]!=='string'||input[key].length>30000))throw Error('Texte trop long ou invalide.');if(input.clinical.schema===2&&!['3m','6m','clinical'].includes(input.reviewWindow))throw Error('Échéance invalide.');
  if(input.clinical.schema===2){
   const distance=input.clinical.walk.distance;
   // Older exact measurements are retained when a draft is otherwise edited.
@@ -109,13 +119,25 @@ export function assessmentRoute({db,user,route,method,body,json}){
   }
  }
  const changed=!isDeepStrictEqual(previous.clinical,input.clinical)||previous.date!==input.date||previous.practitioner!==input.practitioner;next={...next,...Object.fromEntries(['date','practitioner','clinical','diagnosis','project','frequency','duration','reviewDate','evolution','reviewWindow'].filter(k=>input[k]!==undefined).map(k=>[k,input[k]])),updatedAt:now,updatedBy:user.id};
+ if(correction){
+  if(body.confirmation!=='CORRIGER'||body.confirmReviewed!==true||body.generate||input.date!==previous.date||!next.diagnosis.trim()||!next.project.trim()){
+   throw Error('Confirmer la correction et la relecture des textes sans changer la date clinique.');
+  }
+  if(next.clinical.schema===2)validateClinical(next.clinical,true);
+  for(const key of ['diagnosis','project']){
+   next[key+'ValidatedAt']=now;next[key+'ValidatedBy']=user.name;next[key+'ValidatedById']=user.id;
+  }
+  if(changed&&next.proposal)next.proposal={...next.proposal,needsReview:true};
+  db.prepare("DELETE FROM assessment_documents WHERE assessment_id=? OR assessment_id IN (SELECT id FROM assessments WHERE json_extract(data,'$.previousId')=?)").run(id,id);
+ }else{
  if(body.generate===true){db.prepare('INSERT INTO assessment_versions(assessment_id,at,actor,data) VALUES(?,?,?,?)').run(id,now,user.id,JSON.stringify({...next,versionReason:'before-regeneration'}));const proposal={diagnosis:generateDiagnosis(next.clinical),project:generateProject(next.clinical),at:now,by:user.id};next.proposal=proposal;next.diagnosis=proposal.diagnosis;next.project=proposal.project;}
  if(changed&&next.proposal&&body.generate!==true)next.proposal={...next.proposal,needsReview:true};
  const diagnosisChanged=changed||previous.diagnosis!==next.diagnosis,projectChanged=diagnosisChanged||previous.project!==next.project||['frequency','duration','reviewDate','reviewWindow'].some(k=>previous[k]!==next[k]);
  for(const [key,invalid] of [['diagnosis',diagnosisChanged],['project',projectChanged]])if(invalid)for(const suffix of ['ValidatedAt','ValidatedBy','ValidatedById'])delete next[key+suffix];
  if(body.validateDiagnosis===true){if(!next.diagnosis.trim())throw Error('Diagnostic requis.');next.diagnosisValidatedAt=now;next.diagnosisValidatedBy=user.name;next.diagnosisValidatedById=user.id;audit(db,user.id,'assessment.diagnosis.validate',id);}if(body.validateProject===true){if(!next.diagnosisValidatedAt||!next.project.trim())throw Error('Validez d’abord le diagnostic.');next.projectValidatedAt=now;next.projectValidatedBy=user.name;next.projectValidatedById=user.id;audit(db,user.id,'assessment.project.validate',id);}
+ }
  }else throw Error('Action inconnue.');
  if(!db.prepare('SELECT 1 FROM assessment_versions WHERE assessment_id=? LIMIT 1').get(id))db.prepare('INSERT INTO assessment_versions(assessment_id,at,actor,data) VALUES(?,?,?,?)').run(id,now,user.id,JSON.stringify(core(previous)));
- db.prepare('UPDATE assessments SET status=?,revision=revision+1,data=? WHERE id=?').run(next.status,JSON.stringify(next),id);db.prepare('INSERT INTO assessment_versions(assessment_id,at,actor,data) VALUES(?,?,?,?)').run(id,now,user.id,JSON.stringify(next));audit(db,user.id,action==='finalize'?'assessment.finalize':'assessment.update',id);db.exec('COMMIT');json(200,{assessment:published(get(id))});return true;
+ db.prepare('UPDATE assessments SET status=?,revision=revision+1,data=? WHERE id=?').run(next.status,JSON.stringify(next),id);db.prepare('INSERT INTO assessment_versions(assessment_id,at,actor,data) VALUES(?,?,?,?)').run(id,now,user.id,JSON.stringify(next));audit(db,user.id,correction?'assessment.correct':action==='finalize'?'assessment.finalize':'assessment.update',id);db.exec('COMMIT');json(200,{assessment:published(get(id))});return true;
  }catch(e){if(db.isTransaction)db.exec('ROLLBACK');json(400,{error:e.message});return true;}
 }
